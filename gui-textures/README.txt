@@ -1,64 +1,112 @@
-MENU BACKGROUNDS FOR NEXO
-=========================
+NEXO MENU BACKGROUNDS AND HOLOGRAM LOGOS
+========================================
 
-Five themed menu backgrounds, drawn as pixel art at Minecraft's own GUI scale, so each
-wooden cubby sits exactly under the item your menu puts in that slot.
+Six menu backgrounds in one wooden-stall style, plus six 3D hologram logos. Everything is
+pixel art at Minecraft's own scale, so each cubby sits exactly under the item your menu puts
+in that slot, and the logos stay crisp at any size.
 
-  shop_gui           3 rows   buttons in slots 11-15, back button in 26
-  black_market_gui   3 rows   buttons in slots 10, 12, 13, 14, 16, back button in 26
-  quests_gui         3 rows   buttons in slots 12, 14
-  kill_streaks_gui   4 rows   buttons in slots 12, 13, 14, 21, 22, 23
-  media_rank_gui     3 rows   buttons in slots 12, 13, 14, back button in 22
+  MENU               ROWS  BUTTON SLOTS              BACK BUTTON
+  coinflip_gui       3     10 11 12 13 14 15 16      -
+  shop_gui           3     11 12 13 14 15            26
+  black_market_gui   3     10 12 13 14 16            26
+  kill_streaks_gui   4     12 13 14 21 22 23         -
+  quests_gui         3     12 14                     -
+  media_rank_gui     3     12 13 14                  22
 
-(Slots count from 0 in the top-left, 9 per row - the same numbers DeluxeMenus uses.)
+  (Slots count from 0 in the top-left, 9 per row - the same numbers DeluxeMenus uses.)
+
+  HOLOGRAM           TEXT
+  holo_shop          SHOP
+  holo_coinflip      COINFLIP
+  holo_quests        QUESTS
+  holo_black_market  BLACK / market
+  holo_kill_streaks  KILL / streaks
+  holo_media_rank    MEDIA / rank
 
 
 INSTALL
 -------
-1. Copy textures/*.png to
-       plugins/Nexo/pack/assets/minecraft/textures/menus/
-   (If your other glyph textures live somewhere else, put them there instead and change
-   the "texture:" lines in step 2 to match.)
+1. Unzip nexo-gui-pack.zip into  plugins/Nexo/
+   It already has Nexo's folder layout:
+       pack/assets/minecraft/textures/menus/*.png
+       pack/assets/minecraft/textures/holograms/*.png
+       glyphs/menus_glyphs.yml
+       glyphs/holograms_glyphs.yml
 
-2. Copy nexo/menus_glyphs.yml to
-       plugins/Nexo/glyphs/
+2. Run  /nexo reload all  and rejoin so the new resource pack loads.
 
-3. Run  /nexo reload all  and rejoin so the new resource pack loads.
 
-4. Set each menu's title. The sign is part of the picture, so the title is only the
-   picture, pulled 8 pixels left to line up with the menu's edge:
+MENUS
+-----
+Set each menu's title to its picture, pulled 8 pixels left to line up with the menu's edge.
+The sign text is part of the picture, so the title is only the glyph:
 
-       shop:          <shift:-8><glyph:shop_gui>
-       black market:  <shift:-8><glyph:black_market_gui>
-       quests:        <shift:-8><glyph:quests_gui>
-       kill streaks:  <shift:-8><glyph:kill_streaks_gui>
-       media rank:    <shift:-8><glyph:media_rank_gui>
+    coinflip:      <white><shift:-8><glyph:coinflip_gui>
+    shop:          <white><shift:-8><glyph:shop_gui>
+    black market:  <white><shift:-8><glyph:black_market_gui>
+    kill streaks:  <white><shift:-8><glyph:kill_streaks_gui>
+    quests:        <white><shift:-8><glyph:quests_gui>
+    media rank:    <white><shift:-8><glyph:media_rank_gui>
 
-   DeluxeMenus example:
-       menu_title: '<shift:-8><glyph:shop_gui>'
+If your menu plugin can't pass Nexo's tags through, use Nexo's PlaceholderAPI placeholders:
+    %nexo_shift_-8%%nexo_coinflip_gui%
 
-   If your menu plugin can't pass Nexo's tags through, use Nexo's PlaceholderAPI
-   placeholders instead:  %nexo_shift_-8%%nexo_shop_gui%
-   (Nexo's PlaceholderAPI glyph placeholder needs the glyph on its own font. If it
-   prints nothing, add  font: nexo:menus  under each glyph in menus_glyphs.yml.)
+- Keep the buttons in the slots listed above. Kill streaks must be 4 rows, the rest 3 rows.
+- Leave every other slot of the menu EMPTY (no glass-pane filler): the picture already
+  covers the menu's slot grid, and any item would sit on top of it.
+- Your own inventory below the menu is left as it is.
 
-5. Keep the buttons in the slots listed above. The kill streaks menu must be 4 rows;
-   the others 3 rows.
+
+HOLOGRAMS
+---------
+Each logo is one hologram line. It sits on top of the line, so put the hologram where
+you want the bottom of the logo.
+
+  FancyHolograms (text displays, recommended - no dark box behind the logo):
+      /hologram create text shop
+      /hologram edit shop setLine 1 %nexo_holo_shop%
+      /hologram edit shop background transparent
+      /hologram edit shop scale 1.5          (optional: bigger)
+      /hologram edit shop billboard center   (optional: always faces the player)
+
+  DecentHolograms:
+      /dh create shop %nexo_holo_shop%
+
+Both need PlaceholderAPI. Plugins that read Nexo tags can use <glyph:holo_shop> instead.
+
+Size: at scale 1 a one-line logo is about 1 block tall and a two-line logo about 1.6.
+Scale the hologram, or lower both ascent and height in holograms_glyphs.yml, to change it.
 
 
 IF SOMETHING LOOKS OFF
 ----------------------
-- Picture darker than the preview: the title colour is tinting it. Put <white> (or &f)
-  at the start of the title.
-- Picture a few pixels left/right: change -8 in <shift:-8>.
-- Picture too high/low: change ascent in menus_glyphs.yml (higher number = higher).
-- Changing button slots: edit the MENUS list in generate.py and run  python3 generate.py
-  (needs Python 3 and Pillow: pip install pillow). The cubbies follow the slots you list.
+- Picture darker than the preview: the text colour is tinting it. Start the title or
+  hologram line with <white> (or &f).
+- Menu picture a few pixels left/right: change -8 in <shift:-8>.
+- Menu picture too high/low: change ascent in menus_glyphs.yml (higher number = higher).
+- A dark box behind a hologram: that is the name-tag background of armour-stand holograms.
+  Use FancyHolograms with "background transparent", or turn it off in your hologram plugin.
+
+
+CHANGING THEM
+-------------
+Everything is drawn by the Python scripts here (Python 3 + Pillow: pip install pillow).
+
+  generate.py    the menus. MENUS lists each menu's rows, button slots and sign text;
+                 THEMES sets its wood, roof, cubby colours and decorations.
+  holograms.py   the logos. LOGOS lists each logo's lines; the colours are at the top.
+  package.py     runs both, writes the glyph configs and builds nexo-gui-pack.zip.
+
+  python3 package.py
+
+To add a menu: add a line to MENUS with its slots (and a theme), then run package.py.
+To add a logo: add a line to LOGOS, e.g.  "holo_spawn": [("SPAWN", BIG)],
 
 
 FILES
 -----
-textures/     the five PNGs to install
-nexo/         the glyph config
-previews/     4x pictures with stand-in items, as they will look in game
-generate.py   draws everything; edit and re-run to change themes, colours or slots
+nexo-gui-pack.zip   everything to install, laid out like plugins/Nexo/
+textures/           the menu PNGs
+holograms/          the logo PNGs
+nexo/               the glyph configs
+previews/           4x pictures of the menus with stand-in items, and the logos

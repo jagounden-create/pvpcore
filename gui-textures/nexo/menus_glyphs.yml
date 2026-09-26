@@ -1,29 +1,33 @@
-# Nexo glyphs for the menu backgrounds.
-# Put this file in plugins/Nexo/glyphs/ and the PNGs in
-# plugins/Nexo/pack/assets/minecraft/textures/menus/  (next to your other glyph textures).
-# ascent 23 = the image starts 10 px above the menu (for the sign); height = image height in pixels.
+# Menu backgrounds. The image starts 8 px above the menu (for the sign):
+# ascent = 13 + 8, height = the image's height, so it shows at 1:1 scale.
+# Title of each menu:  <white><shift:-8><glyph:ID>
 
-quests_gui:
-  texture: menus/quests_gui
-  ascent: 23
-  height: 84
-
-black_market_gui:
-  texture: menus/black_market_gui
-  ascent: 23
-  height: 84
+coinflip_gui:
+  texture: menus/coinflip_gui
+  ascent: 21
+  height: 81
 
 shop_gui:
   texture: menus/shop_gui
-  ascent: 23
-  height: 84
+  ascent: 21
+  height: 81
+
+black_market_gui:
+  texture: menus/black_market_gui
+  ascent: 21
+  height: 81
 
 kill_streaks_gui:
   texture: menus/kill_streaks_gui
-  ascent: 23
-  height: 102
+  ascent: 21
+  height: 99
+
+quests_gui:
+  texture: menus/quests_gui
+  ascent: 21
+  height: 81
 
 media_rank_gui:
   texture: menus/media_rank_gui
-  ascent: 23
-  height: 84
+  ascent: 21
+  height: 81
