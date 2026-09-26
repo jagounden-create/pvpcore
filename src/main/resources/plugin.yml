@@ -1,0 +1,27 @@
+name: PvPCore
+version: '${project.version}'
+main: com.pvpcore.PvPCore
+api-version: '1.21'
+description: PvP optimization for Sword, Mace, Cart and Diamond SMP combat, plus server-side cleanups - every switch in one menu.
+softdepend: [KnockbackSync, PaperAttributeSwapFix]
+
+commands:
+  pvpcore:
+    description: Open the PvP settings menu.
+    usage: /<command> [menu|status|reload|toggle|set|preset]
+    aliases: [pvpc]
+    permission: pvpcore.admin
+
+permissions:
+  pvpcore.admin:
+    description: Open the settings menu and change settings.
+    default: op
+  pvpcore.bypass.crystals:
+    description: Use end crystals and respawn anchors where crystal PvP is banned.
+    default: false
+  pvpcore.bypass.combattag:
+    description: Never get combat tagged.
+    default: false
+  pvpcore.bypass.rules:
+    description: Item rules (nerfs, cooldowns, disabled items, block limits) don't apply.
+    default: false
