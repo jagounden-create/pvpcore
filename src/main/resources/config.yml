@@ -1,0 +1,270 @@
+# ============================================================================
+#  PvP settings
+#
+#  Everything here is also in the in-game menu: /pvpcore
+#    click                     turn a switch on or off
+#    right-click               raise its number
+#    shift + right-click       lower its number
+#  Changes made in the menu are saved to this file straight away.
+#
+#  /pvpcore reload     re-read this file (and rules.yml) after editing by hand
+#  /pvpcore status     what is on, and what this server supports
+#  /pvpcore preset     one-click setups: diamond-smp, sword, mace, cart, vanilla
+#
+#  Item nerfs, cooldowns and block limits live in rules.yml.
+# ============================================================================
+
+config-version: 3
+
+# ----------------------------------------------------------------------------
+#  SWORD - knockback, hit reg, weapons
+# ----------------------------------------------------------------------------
+combat:
+  knockback-distance:
+    # How far back a hit throws someone along the ground. Scales where they
+    # end up, so knockback resistance still counts.
+    enabled: true
+    # 1.0 = vanilla, 0.9 = a tenth less ground covered.
+    factor: 0.9
+  vertical-knockback:
+    # Every hit near the ground lifts the player. Vanilla only lifts when the
+    # server thinks you're on the ground, and it hears that one ping late, so
+    # hits as you land or step give no lift. Within a block of the floor
+    # counts as on the ground here; higher up, vanilla is kept so air combos
+    # still work. Stands down if KnockbackSync is installed.
+    enabled: true
+    # How high a hit throws you, in blocks per tick. Vanilla 0.4.
+    lift: 0.45
+  # Leaf only: hits and their knockback are sent the moment they land, not at
+  # the end of the tick.
+  instant-knockback: true
+  # Swap items in the same tick as a hit and keep the damage of the item you
+  # swapped from (axe to sword). Paper turns this off by default.
+  attribute-swapping: true
+  hit-delay:
+    # Use the invulnerability time below after a hit. Off = vanilla.
+    enabled: false
+    # Vanilla 20 ticks.
+    ticks: 20
+  # Sword sweeps stop hurting (and pushing) players next to your target.
+  disable-sweep: false
+  lunge-cooldown:
+    # 1.21.11+: seconds between spear Lunge dashes. A lunge during the
+    # cooldown costs no hunger and does not move you; the jab still hits.
+    enabled: true
+    seconds: 3.0
+  bedrock-buff:
+    # Bedrock players (Geyser) deal this much more damage with swords and
+    # axes. A single multiplier - it never stacks with itself. Detected with
+    # Floodgate or Geyser when installed, else by Floodgate's UUID format.
+    enabled: true
+    percent: 2.0
+
+# ----------------------------------------------------------------------------
+#  MACE
+# ----------------------------------------------------------------------------
+mace:
+  # A smash that connects never costs fall damage - even when lag or the
+  # target's hit immunity swallowed the hit. Only the fall that the smash
+  # was made in is covered.
+  smash-fall-protection: true
+  smash-damage:
+    # Scale the bonus damage smashes get from falling. Hits on players only.
+    enabled: false
+    factor: 1.0
+  damage-cap:
+    # Most damage a single mace hit on a player can deal, in hearts, before
+    # armor.
+    enabled: false
+    hearts: 20
+  smash-cooldown:
+    # After a smash, the next smash deals normal mace damage until this
+    # wears off. The action bar shows the time left.
+    enabled: false
+    seconds: 1.5
+  wind-charge-cooldown:
+    # Ticks between wind charge throws. Vanilla 10.
+    enabled: false
+    ticks: 10
+  # Falls that began with an elytra glide get no smash bonus.
+  no-elytra-smash: false
+
+# ----------------------------------------------------------------------------
+#  CART - TNT minecart PvP
+# ----------------------------------------------------------------------------
+cart:
+  hit-reg:
+    # Shoot a flame arrow, place rail and cart in its path: with ping, the
+    # cart reaches the server after the arrow already flew through. Burning
+    # arrow paths are remembered, and a cart placed where one passed within
+    # the placer's ping goes off exactly as the hit would have.
+    enabled: true
+    # The most ping it makes up for, in milliseconds.
+    max-ms: 250
+  bow-damage:
+    # Damage (to players) of carts set off by a bow arrow - the insta cart.
+    enabled: true
+    factor: 0.8
+  crossbow-damage:
+    # Damage (to players) of carts set off by a crossbow arrow. Crossbow
+    # arrows fly faster and make far bigger blasts, so these are nerfed more.
+    enabled: true
+    factor: 0.6
+  consistent-power:
+    # Every cart blast has this power instead of a random roll between 4
+    # and 11.5 (vanilla, depending on speed).
+    enabled: false
+    power: 6.0
+  self-damage:
+    # How much your own cart blast hurts you, in percent.
+    enabled: false
+    percent: 50
+  activator-fuse:
+    # Fuse of carts lit by an activator rail. Vanilla 80 ticks.
+    enabled: false
+    ticks: 40
+  # Carts going off together in one spot make one blast instead of a chain of
+  # lag spikes.
+  merge-blasts: true
+  chunk-limit:
+    # Most TNT carts one chunk can hold (placed or dispensed).
+    enabled: true
+    max: 12
+  cleanup:
+    # Unlit TNT carts players place are removed after this many seconds.
+    enabled: false
+    seconds: 30
+  # Cart blasts still hurt players but leave blocks intact.
+  protect-terrain: false
+  # Blocks cart blasts break drop nothing, so no item lag.
+  no-block-drops: true
+
+# ----------------------------------------------------------------------------
+#  DIAMOND SMP - shields, pots, pearls
+# ----------------------------------------------------------------------------
+shields:
+  # Shields can be raised at all.
+  usage: true
+  delay:
+    # How long a raised shield takes to start blocking. Set once, so shields
+    # never "reload" mid-fight. Off = vanilla 250 ms.
+    enabled: true
+    ms: 120
+  stun:
+    # Axes always stun a raised shield - even inside its raise delay, and even
+    # while the attacker holds their own right-click - and the follow-up hit
+    # always lands with full knockback. Off = shields can't be stunned.
+    enabled: true
+    # How long a stunned shield stays down. Vanilla 5.
+    seconds: 5.0
+  # Both players hear the shield break on a stun.
+  break-sound: true
+
+pots:
+  fast-pots:
+    # A splash pot thrown at your feet (looking down 45 degrees or more)
+    # bursts on its first tick, even mid-jump. Aimed throws stay vanilla.
+    # Pots never have a cooldown.
+    enabled: true
+    # Extra downward speed, in blocks per tick.
+    speed: 2.5
+  # Your own healing pots always heal you at full strength, even when they
+  # land a step away. Pots with a harmful effect are left alone.
+  full-strength-self-pots: true
+
+pearls:
+  # Land exactly where the pearl hit - never short, in mid-air or stuck in
+  # a wall. If that spot is blocked, the vanilla landing is kept.
+  land-on-impact: true
+  # Pearls stop hurting you on landing.
+  no-damage: false
+  cooldown:
+    # Ticks between pearl throws. Vanilla 20.
+    enabled: false
+    ticks: 20
+
+clumps:
+  # XP orbs clump together and are absorbed instantly, so XP bottles mend gear
+  # in one go.
+  enabled: true
+  # How close orbs have to be to merge, in blocks.
+  merge-radius: 2.0
+
+# ----------------------------------------------------------------------------
+#  GENERAL
+# ----------------------------------------------------------------------------
+health:
+  # Health and a heart under every player's name, like "17 ❤".
+  below-name: true
+  # After you hit someone, your action bar shows their health.
+  action-bar: true
+
+particles:
+  # The dark heart particles every hit spawns are not sent to anyone.
+  no-damage-hearts: true
+  # Crit and sweep particles are not sent. Attackers still see their own
+  # crits, which their game draws itself.
+  no-hit-particles: true
+  # Big blasts (carts, crystals, TNT) show one small puff instead of the big
+  # explosion and its flying debris. Wind charge gusts are left alone.
+  light-explosions: true
+
+general:
+  arrow-cleanup:
+    # Arrows stuck in blocks vanish after this many seconds. Vanilla 60.
+    # Tridents are never touched.
+    enabled: true
+    seconds: 10
+  # Skip the death screen.
+  instant-respawn: false
+
+combat-tag:
+  # A PvP hit tags both players. Tagged players can't use the commands below,
+  # and logging out while tagged kills them (their items drop).
+  enabled: false
+  seconds: 15
+  kill-on-logout: true
+  blocked-commands: [spawn, home, homes, warp, warps, tpa, tpahere, tpaccept, rtp, back, ec, enderchest]
+
+crystal-pvp:
+  # No end crystals: they can't be placed, hit or blown up.
+  ban-crystals: true
+  # Respawn anchors can't be used to blow people up (outside the Nether).
+  ban-anchors: true
+  # Only in these worlds, e.g. [arena, ffa]. Empty = every world except the
+  # End, so the dragon fight still works.
+  worlds: []
+
+item-rules:
+  # Apply rules.yml (item nerfs, cooldowns, block limits).
+  enabled: true
+
+# ----------------------------------------------------------------------------
+#  MENU AND MESSAGES
+# ----------------------------------------------------------------------------
+menu:
+  # The menu's title. MiniMessage colours work.
+  title: "PvP Settings"
+  # Accent colour for names in the menu.
+  accent: "#7DD3FC"
+  # The item that fills empty slots. AIR leaves them empty.
+  filler: BLACK_STAINED_GLASS_PANE
+  # Menu names in small capitals.
+  small-caps: true
+
+# Everything players see. MiniMessage format; "" sends nothing.
+messages:
+  crystal-disabled: "<#F87171>Crystal PvP is disabled here."
+  anchor-disabled: "<#F87171>Anchor PvP is disabled here."
+  cart-limit: "<#F87171>Too many TNT carts in this chunk."
+  lunge-cooldown: "<#A1A1AA>Lunge ready in <white><seconds>s"
+  smash-cooldown: "<#A1A1AA>Smash ready in <white><seconds>s"
+  combat-bar: "<white>In combat <gray>· <white><seconds>s"
+  combat-start: ""
+  combat-end: "<#4ADE80>You are no longer in combat."
+  combat-command: "<#F87171>You can't use that command in combat."
+  combat-logout: "<gray><player> logged out in combat."
+  rule-disabled: "<#F87171><item> is disabled here."
+  rule-cooldown: "<#A1A1AA><item> ready in <white><seconds>s"
+  rule-player-limit: "<#F87171>You can only have <limit> <item> placed."
+  rule-chunk-limit: "<#F87171>This chunk already has <limit> <item>."
