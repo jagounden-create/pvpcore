@@ -59,7 +59,7 @@ def main():
         for name in configs:
             z.write(os.path.join(ROOT, "nexo", name), f"glyphs/{name}")
         z.write(os.path.join(ROOT, "README.txt"), "README.txt")
-        for name in ("all_menus.png", "all_menus_gray.png", "all_holograms.png"):
+        for name in ("all_menus.png", "all_holograms.png"):
             z.write(os.path.join(ROOT, "previews", name), f"previews/{name}")
 
     print(f"{len(menu_sizes)} menus, {len(holo_sizes)} holograms -> {ZIP_NAME}")

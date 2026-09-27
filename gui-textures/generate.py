@@ -2,9 +2,10 @@
 """
 Market-stall Nexo GUI textures for chest menus, drawn as pixel art at Minecraft's GUI scale.
 
-Each menu is a wooden stall: a carved sign on a slab roof, braces down to two posts, a shelf
-unit whose cubbies sit exactly under the menu's items, a ledge, and a panelled counter front
-with drawers. Every menu also comes in a slate-grey version (same art, other palette).
+Each menu is a stall: a carved sign on a roof, braces down to two posts, a shelf unit whose
+cubbies sit exactly under the menu's items, a ledge, and a panelled counter front with
+drawers. Every menu has its own theme on top of that: the wood, the roof (slab, striped
+awning, velvet, ragged cloth, canvas), the sign lettering, props on the roof and lights.
 
 Every texture is 176 px wide (a chest GUI) and starts TOP px above the GUI so the sign can sit
 on the roof and stick out over the top edge. Slot (row r, column c) has its frame at
@@ -19,6 +20,7 @@ Menu title:                            <white><shift:-8><glyph:ID>
 Run:  python3 generate.py      (needs Pillow: pip install pillow)
 """
 import colorsys
+import math
 import os
 from PIL import Image
 
@@ -28,6 +30,7 @@ HEADER = 17       # vanilla title bar height
 PITCH = 18
 LEFT = 7
 GUI_GREY = '#C6C6C6'
+DROP_SHADOW = '#8B8B8B'
 
 # ------------------------------------------------------------------ colours
 
@@ -39,6 +42,10 @@ def hexc(value, alpha=255):
 
 def blend(a, b, t):
     return tuple(int(a[i] * (1 - t) + b[i] * t) for i in range(3)) + (255,)
+
+
+def to_hex(c):
+    return '#%02X%02X%02X' % tuple(c[:3])
 
 
 # Wood, darkest to lightest. One letter per colour keeps the drawing code short.
@@ -64,25 +71,39 @@ WOOD = {
     'l': '#DB9D76',  # highlights, letters
     # roof slab
     'x': '#4A3729',  # under the roof
-    'z': '#614C3C',  # the sign's shadow on the roof
+    'z': '#614C3C',  # shade on the roof
     'F': '#7D624D',  # roof outline
     'b': '#917560',  # roof front
     'a': '#B6997B',  # roof top
     'w': '#D1B18E',  # roof front edge
     # on the menu background
-    'q': '#8B8B8B',  # drop shadow
+    'q': DROP_SHADOW,
     '.': GUI_GREY,
 }
+WOOD_KEYS = 'GedvgKkLH1c:yij2hsl'
+ROOF_KEYS = 'xzFbaw'
+
+
+def tint(base, keys, hue=None, sat=None, sat_mul=1.0, light_mul=1.0, light_add=0.0, extra=None):
+    """A new palette: the given keys moved to another hue, saturation and lightness."""
+    out = dict(base)
+    for k in keys:
+        r, g, b, _ = hexc(base[k])
+        h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        h = h if hue is None else hue
+        s = min(1.0, s * sat_mul) if sat is None else sat
+        l = max(0.0, min(1.0, l * light_mul + light_add))
+        r, g, b = colorsys.hls_to_rgb(h, l, s)
+        out[k] = '#%02X%02X%02X' % (round(r * 255), round(g * 255), round(b * 255))
+    out.update(extra or {})
+    return out
 
 
 def slate(palette):
     """The same palette in slate grey: keep each colour's lightness, swap the hue."""
-    out = {}
-    for key, value in palette.items():
-        if key in 'q.':
-            out[key] = value
-            continue
-        r, g, b, _ = hexc(value)
+    out = dict(palette)
+    for key in WOOD_KEYS + ROOF_KEYS:
+        r, g, b, _ = hexc(palette[key])
         h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
         l = min(1.0, l * 1.06 + 0.02)
         s = 0.16 if l < 0.75 else 0.10
@@ -91,22 +112,35 @@ def slate(palette):
     return out
 
 
-PALETTES = {"": WOOD, "_gray": slate(WOOD)}
-
-
 class Canvas:
     def __init__(self, width, height, palette):
         self.img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         self.px = self.img.load()
         self.w, self.h = width, height
         self.pal = {k: hexc(v) for k, v in palette.items()}
+        self.background = {hexc(GUI_GREY), hexc(DROP_SHADOW)}
 
     def color(self, c):
-        return self.pal[c] if isinstance(c, str) else c
+        return self.pal[c] if isinstance(c, str) and len(c) == 1 else (hexc(c) if isinstance(c, str) else c)
 
     def put(self, x, y, c):
         if 0 <= x < self.w and 0 <= y < self.h and c is not None:
             self.px[x, y] = self.color(c)
+
+    def get(self, x, y):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            return self.px[x, y]
+        return (0, 0, 0, 0)
+
+    def is_stall(self, x, y):
+        p = self.get(x, y)
+        return p[3] > 0 and p not in self.background
+
+    def shade(self, x, y, color, amount):
+        """Tint a pixel that is already drawn (shadows and light)."""
+        p = self.get(x, y)
+        if p[3]:
+            self.px[x, y] = blend(p, self.color(color), amount)[:3] + (p[3],)
 
     def rect(self, x0, y0, x1, y1, c):
         c = self.color(c)
@@ -247,10 +281,13 @@ def glyph_cells(text, x, y, font):
     return cells
 
 
-def carved_text(cv, x, y, text):
+CARVED = dict(face='l', band='s', overhang='c', edge='v', lip='s')
+
+
+def carved_text(cv, x, y, text, colors=CARVED):
     """Sign letters: a light face with a darker band through the middle, shadow where the
     upper half overhangs, and a two-row block edge underneath."""
-    cells = glyph_cells(text, x, y, SIGN_FONT)
+    c = dict(CARVED, **colors)
     cx = x
     for ch in text:
         rows = SIGN_FONT[ch]
@@ -258,17 +295,16 @@ def carved_text(cv, x, y, text):
             for gx, p in enumerate(line):
                 px, py = cx + gx, y + gy
                 if p == '#':
-                    cv.put(px, py, 's' if gy == 2 else 'l')
+                    cv.put(px, py, c['band'] if gy == 2 else c['face'])
                 elif gy > 0 and rows[gy - 1][gx] == '#':
-                    cv.put(px, py, 'c')
-        base = rows[-1]
-        for gx, p in enumerate(base):
+                    cv.put(px, py, c['overhang'])
+        for gx, p in enumerate(rows[-1]):
             if p == '#':
-                cv.put(cx + gx, y + 6, 'v')
-                cv.put(cx + gx, y + 7, 'v')
-                cv.put(cx + gx, y + 8, 's')
+                cv.put(cx + gx, y + 6, c['edge'])
+                cv.put(cx + gx, y + 7, c['edge'])
+                cv.put(cx + gx, y + 8, c['lip'])
         cx += len(rows[0]) + 1
-    return cells
+    return glyph_cells(text, x, y, SIGN_FONT)
 
 
 def small_text(cv, x, y, text, face, shadow):
@@ -278,7 +314,19 @@ def small_text(cv, x, y, text, face, shadow):
         cv.put(px, py, face)
 
 
-# ------------------------------------------------------------------ roof and sign
+def glow(cv, cx, cy, radius, color, strength=0.5):
+    """Soft light on the stall (never on the menu background)."""
+    color = cv.color(color)
+    for y in range(cy - radius, cy + radius + 1):
+        for x in range(cx - radius, cx + radius + 1):
+            d = math.hypot(x - cx, y - cy)
+            if d <= radius and cv.is_stall(x, y):
+                a = strength * (1 - d / radius) ** 2
+                if a > 0.02:
+                    cv.shade(x, y, color, a)
+
+
+# ------------------------------------------------------------------ roofs
 
 
 def draw_cover(cv, rows):
@@ -286,36 +334,117 @@ def draw_cover(cv, rows):
     cv.rect(3, TOP + 3, W - 4, slot_y(rows), '.')
 
 
-def draw_roof(cv, y0=TOP + 6):
-    """A slab roof seen from a little above: bevelled back corners, a lit front edge."""
-    insets = [4, 4, 3, 3, 2, 2, 1, 1, 0, 0]
-    cv.hline(5 + insets[0], mirror(5 + insets[0]), y0, 'F')
-    for i, inset in enumerate(insets[1:], start=1):
-        y = y0 + i
-        cv.hline(6 + inset, mirror(6 + inset), y, 'a')
-        cv.put(5 + inset, y, 'F')
-        cv.put(mirror(5 + inset), y, 'F')
-    y = y0 + len(insets)
-    cv.put(5, y, 'a')
-    cv.hline(6, mirror(6), y, 'w')
-    cv.put(mirror(5), y, 'a')
-    for y in range(y0 + len(insets) + 1, y0 + len(insets) + 6):
-        cv.hline(6, mirror(6), y, 'b')
-        cv.put(5, y, 'F')
-        cv.put(mirror(5), y, 'F')
-    cv.hline(6, mirror(6), y0 + len(insets) + 6, 'x')
+ROOF_Y = TOP + 6
+ROOF_INSETS = [4, 4, 3, 3, 2, 2, 1, 1, 0, 0]
 
 
-def draw_sign(cv, text):
+def roof_cells():
+    """(x, y, part) for every pixel of the roof: 'outline', 'top', 'edge' or 'front'."""
+    y0 = ROOF_Y
+    for x in range(5 + ROOF_INSETS[0], mirror(5 + ROOF_INSETS[0]) + 1):
+        yield x, y0, 'outline'
+    for i, inset in enumerate(ROOF_INSETS[1:], start=1):
+        yield 5 + inset, y0 + i, 'outline'
+        yield mirror(5 + inset), y0 + i, 'outline'
+        for x in range(6 + inset, mirror(6 + inset) + 1):
+            yield x, y0 + i, 'top' if i > 1 else 'top1'
+    n = len(ROOF_INSETS)
+    for x in range(6, mirror(6) + 1):
+        yield x, y0 + n, 'edge'
+    yield 5, y0 + n, 'top'
+    yield mirror(5), y0 + n, 'top'
+    for y in range(y0 + n + 1, y0 + n + 6):
+        yield 5, y, 'outline'
+        yield mirror(5), y, 'outline'
+        for x in range(6, mirror(6) + 1):
+            yield x, y, 'front' if y < y0 + n + 5 else 'front_low'
+
+
+def draw_roof(cv, roof):
+    style = roof.get('style', 'slab')
+    hem_y = ROOF_Y + len(ROOF_INSETS) + 6
+    if style == 'slab':
+        tones = {'outline': 'F', 'top': 'a', 'top1': 'a', 'edge': roof.get('edge', 'w'),
+                 'front': 'b', 'front_low': 'b'}
+        for x, y, part in roof_cells():
+            cv.put(x, y, tones[part])
+        cv.hline(6, mirror(6), hem_y, 'x')
+        if roof.get('glow_edge'):
+            for x in range(6, mirror(6) + 1):
+                cv.shade(x, hem_y - 6, roof['glow_edge'], 0.35)
+        return
+    ramps = [tuple(hexc(c) for c in ramp) for ramp in roof['ramps']]
+    width = roof.get('stripe')
+
+    def ramp_at(x):
+        return ramps[((x - 5) // width) % len(ramps)] if width else ramps[0]
+
+    def fold(x, ramp):
+        """Velvet and cloth: soft vertical folds."""
+        if width:
+            return ramp[3]
+        k = (x // 2 + (x // 7)) % 5
+        return (ramp[2], ramp[3], ramp[4], ramp[3], ramp[2])[k]
+
+    for x, y, part in roof_cells():
+        ramp = ramp_at(x)
+        if part == 'outline':
+            c = ramp[0]
+        elif part == 'top1':
+            c = ramp[4]
+        elif part == 'top':
+            c = fold(x, ramp)
+        elif part == 'edge':
+            c = ramp[4]
+        elif part == 'front':
+            c = ramp[2] if width else (ramp[1], ramp[2], ramp[3], ramp[2], ramp[1])[(x // 2 + (x // 7)) % 5]
+        else:
+            c = ramp[1]
+        cv.put(x, y, c)
+    hem = roof.get('hem', 'straight')
+    x0, x1 = 6, mirror(6)
+    if hem == 'scallop':
+        for x in range(x0, x1 + 1):
+            ramp = ramp_at(x)
+            local = (x - 5) % width
+            depth = 3 if 1 < local < width - 2 else (2 if local in (1, width - 2) else 1)
+            for d in range(depth):
+                cv.put(x, hem_y + d, ramp[1] if d < depth - 1 else ramp[2])
+            cv.put(x, hem_y + depth, ramp[0])
+    elif hem == 'ragged':
+        depths = [1, 2, 4, 3, 1, 2, 5, 3, 2, 1, 3, 4, 2, 1, 2, 3, 5, 2, 1, 3]
+        for x in range(x0, x1 + 1):
+            ramp = ramp_at(x)
+            depth = depths[(x * 7) % len(depths)] if x % 3 else max(1, depths[(x * 7) % len(depths)] - 1)
+            for d in range(depth):
+                cv.put(x, hem_y + d, ramp[1] if d < depth - 1 else ramp[0])
+    elif hem == 'fringe':
+        gold, dark = hexc(roof.get('trim', '#E8B84A')), hexc(roof.get('trim_dark', '#9A6A1C'))
+        cv.hline(x0, x1, hem_y, gold)
+        for x in range(x0, x1 + 1):
+            cv.put(x, hem_y + 1, gold if x % 2 == 0 else dark)
+            if x % 2 == 0:
+                cv.put(x, hem_y + 2, dark)
+    elif hem == 'rope':
+        for x in range(x0, x1 + 1):
+            cv.put(x, hem_y, hexc('#C8A26A') if x % 3 else hexc('#7A5A30'))
+            cv.put(x, hem_y + 1, hexc('#8A6A3A') if x % 3 != 1 else hexc('#5A3E20'))
+    else:
+        for x in range(x0, x1 + 1):
+            cv.put(x, hem_y, ramp_at(x)[0])
+
+
+def draw_sign(cv, text, style=None):
+    """The sign on the roof. Returns its left and right x, for placing props beside it."""
+    style = style or {}
     tw = text_width(text, SIGN_FONT)
     width = max(78, tw + 22)
     x0 = W // 2 - width // 2
     x1 = x0 + width - 1
     # its shadow on the roof
-    cv.hline(x0 - 1, x1 + 1, 15, 'z')
-    cv.hline(x0 - 1, x1 + 1, 16, 'z')
-    cv.hline(x0 - 1, x1 + 1, 17, 'z')
-    cv.hline(x0, x1, 18, 'z')
+    for y, a, b in ((15, x0 - 1, x1 + 1), (16, x0 - 1, x1 + 1), (17, x0 - 1, x1 + 1), (18, x0, x1)):
+        for x in range(a, b + 1):
+            cv.shade(x, y, (0, 0, 0, 255), 0.42)
     # board
     cv.hline(x0 + 2, x1 - 2, 0, 'c')
     cv.row(x0 + 1, 1, 'c')
@@ -336,7 +465,27 @@ def draw_sign(cv, text):
     cv.hline(x0 + 1, x1 - 1, 15, 'c')
     cv.put(x1, 15, 'v')
     cv.hline(x0 + 1, x1 - 1, 16, 'v')
-    carved_text(cv, W // 2 - tw // 2, 4, text)
+    tx = W // 2 - tw // 2
+    if style.get('glow'):
+        # light spilling from the letters onto the board
+        cells = glyph_cells(text, tx, 4, SIGN_FONT)
+        for y in range(3, 13):
+            for x in range(x0 + 3, x1 - 2):
+                if (x, y) in cells:
+                    continue
+                d = min((abs(x - cx) + abs(y - cy) for cx, cy in cells if abs(x - cx) <= 3 and abs(y - cy) <= 3), default=9)
+                if d <= 3:
+                    cv.shade(x, y, style['glow'], (0.55, 0.32, 0.14)[d - 1])
+    carved_text(cv, tx, 4, text, style.get('letters', {}))
+    if style.get('bulbs'):
+        warm, bright = hexc('#FFB23E'), hexc('#FFF4C2')
+        for i, x in enumerate(range(x0 + 3, x1 - 2, 4)):
+            cv.put(x, 1, bright if i % 2 == 0 else warm)
+            cv.put(x, 14, warm if i % 2 == 0 else bright)
+        for i, y in enumerate(range(4, 13, 4)):
+            cv.put(x0 + 1, y, bright if i % 2 else warm)
+            cv.put(x1 - 1, y, warm if i % 2 else bright)
+    return x0, x1
 
 
 # ------------------------------------------------------------------ stall body
@@ -429,15 +578,16 @@ def draw_post(cv, top, joint, drawer_top, bottom):
         row(POST_L + 1, bottom + 2, 'q' * 14)
 
 
-def cubby_opening(cv, x, y, boarded=False):
-    """One wooden cubby of the shelf unit, 18 px wide, frame at (x, y)."""
+def cubby_opening(cv, x, y, bay=None):
+    """One cubby of the shelf unit, 18 px wide, frame at (x, y). bay is how a spot with no
+    item looks: 'boards' (default), or 'curtain' / 'curtain_eyes'."""
     inner0, inner1 = x + 2, x + 15
     cv.put(x + 1, y, 'y')
     cv.put(x + 16, y, 'y')
     for yy in range(y + 1, y + 17):
         cv.put(x + 1, yy, 's')
         cv.put(x + 16, yy, 's')
-    if boarded:
+    if bay in ('boards', None) and bay is not None:
         # boarded up: planks with a batten across
         for yy in range(y, y + 17):
             for xx in range(inner0, inner1 + 1):
@@ -448,6 +598,24 @@ def cubby_opening(cv, x, y, boarded=False):
             cv.hline(inner0, inner1, yy, c)
         cv.put(inner0 + 1, y + 8, 'd')
         cv.put(inner1 - 1, y + 8, 'd')
+        return
+    if bay in ('curtain', 'curtain_eyes'):
+        folds = [hexc(c) for c in ('#2A1238', '#3D1A52', '#55246F', '#6C3190', '#55246F', '#3D1A52')]
+        gap = 2 if bay == 'curtain' else 4
+        mid = (inner0 + inner1) // 2
+        for yy in range(y, y + 17):
+            spread = gap + (yy - y) // 6
+            for xx in range(inner0, inner1 + 1):
+                if mid - spread // 2 < xx <= mid + (spread + 1) // 2:
+                    cv.put(xx, yy, hexc('#0B0610'))
+                else:
+                    cv.put(xx, yy, folds[(xx - inner0) % len(folds)])
+        cv.hline(inner0, inner1, y, hexc('#C9A040'))
+        cv.hline(inner0, inner1, y + 1, hexc('#6A4A1A'))
+        if bay == 'curtain_eyes':
+            for ex in (mid - 1, mid + 2):
+                cv.put(ex, y + 7, hexc('#E6B8FF'))
+                cv.put(ex, y + 8, hexc('#9A5CFF'))
         return
     cv.hline(inner0, inner1, y, 'l')
     cv.hline(inner0, inner1, y + 1, 'e')
@@ -501,7 +669,7 @@ def colored_box(cv, x, y, b):
     cv.hline(x, x + 17, y + 15, b.light)
 
 
-def draw_unit(cv, cubby_rows, buttons, boxes):
+def draw_unit(cv, cubby_rows, buttons, boxes, bays):
     """The shelf unit: a rail, a row of cubbies per cubby row, the shelf and its ledge.
     Returns the first row of the counter front."""
     top = slot_y(cubby_rows[0]) - 1
@@ -515,7 +683,7 @@ def draw_unit(cv, cubby_rows, buttons, boxes):
             s = r * 9 + c
             if s in boxes:
                 continue
-            cubby_opening(cv, slot_x(c), y, boarded=s not in buttons)
+            cubby_opening(cv, slot_x(c), y, None if s in buttons else bays.get(s, bays.get('*', 'boards')))
     for r in cubby_rows:
         y = slot_y(r)
         coloured = [c for c in range(1, 8) if r * 9 + c in boxes]
@@ -610,17 +778,213 @@ def plaque(cv, cx, y, text):
     cv.hline(x0 + 1, x1 + 1, y + 9, 'e')
 
 
+# ------------------------------------------------------------------ props and decorations
+
+# Small pixel sprites for the roof and the stall. '.' is transparent.
+SPRITES = {
+    'potion': ([".cc.", ".gg.", "gPpg", "gppg", "gppg", ".gg."],
+               {'c': '#9A6442', 'g': '#241830', 'P': '#F2D6FF', 'p': '#A855F7'}),
+    'potion_green': (["..cc..", "..gg..", ".gPpg.", "gPpppg", "gppppg", "gppppg", ".gggg."],
+                     {'c': '#9A6442', 'g': '#1C2A1C', 'P': '#D8FFD0', 'p': '#3FCF63'}),
+    'skull': ([".bbbbb.", "bbbbbbs", "bEbbEbs", "bbbnbbs", ".bbbbs.", ".b.b.s."],
+              {'b': '#E8E0CC', 's': '#B3A892', 'E': '#1E1418', 'n': '#6A5E50'}),
+    'candle': ([".f", "fF", "ww", "wW", "wW", "WW"],
+               {'f': '#FFF3A0', 'F': '#FF9A2E', 'w': '#EDE4D2', 'W': '#B9AD96'}),
+    'coins': ([".yyyy.", "YyyyyY", "dYYYYd", ".yyyy.", "YyyyyY", "dYYYYd", ".yyyy.", "YyyyyY", "dYYYYd"],
+              {'y': '#FFE07A', 'Y': '#E0A82A', 'd': '#8A6414'}),
+    'coins_low': ([".yyyy.", "YyyyyY", "dYYYYd", ".yyyy.", "YyyyyY", "dYYYYd"],
+                  {'y': '#FFE07A', 'Y': '#E0A82A', 'd': '#8A6414'}),
+    'crate': (["oooooooo", "ohhhhhho", "ohbLLbho", "ohLbbLho", "ohLbbLho", "ohbLLbho", "ohhhhhho", "oooooooo"],
+              {'o': '#3E2614', 'h': '#C08A52', 'L': '#A06A3A', 'b': '#6E4424'}),
+    'barrel': ([".ooooo.", "oBbBbBo", "oiiiiio", "oBbBbBo", "oBbBbBo", "oBbBbBo", "oiiiiio", "oBbBbBo", ".ooooo."],
+               {'o': '#2E1C10', 'B': '#A4683A', 'b': '#84522C', 'i': '#5C5E66'}),
+    'sword': (["..p..", "..h..", "..h..", "gGgGg", ".lLo.", ".lLo.", ".lLo.", ".lLo.", ".lLo."],
+              {'p': '#F2C94C', 'h': '#6A4222', 'g': '#E0B040', 'G': '#A87C1C', 'l': '#F2F6FA', 'L': '#AAB6C4',
+               'o': '#4A525E'}),
+    'shield': (["ooooooo", "oRRyRRo", "oRRyRRo", "oyyyyyo", "oRRyRRo", "oRRyRRo", ".oRyRo.", "..oyo..", "...o..."],
+               {'o': '#3A2418', 'R': '#B83A3A', 'y': '#EED48A'}),
+    'gear': (["...gg...", ".g.gg.g.", "..gggg..", "gggddggg", "gggddggg", "..gggg..", ".g.gg.g.", "...gg..."],
+             {'g': '#B4BCC6', 'd': '#3E444C'}),
+    'gear_small': (["..gg..", ".gggg.", "ggddgg", "ggddgg", ".gggg.", "..gg.."],
+                   {'g': '#8E98A4', 'd': '#3E444C'}),
+    'globe': ([".ooooo.", "oBBGGBo", "oBGGBBo", "oBBBGGo", "oGBBBBo", "oBBGBBo", ".ooooo.", "...w...", "..www..",
+               ".wwwww."],
+              {'B': '#3F86D6', 'G': '#5DB85A', 'o': '#1B3553', 'w': '#7A4A30'}),
+    'map': (["oooooooooo", "rPPPPPPPPr", "rPlPPPPxPr", "rPPlPlPPPr", "rPPPPlPPPr", "oooooooooo"],
+            {'P': '#EEDDB0', 'l': '#B84A3A', 'x': '#D0302A', 'r': '#B89458', 'o': '#6A4E2A'}),
+    'book': (["oooooooo.", "oRRRRRRop", "oRyyyRRop", "oRRRRRRop", "oRRRRRRop", "oooooooo."],
+             {'R': '#7A2E2E', 'y': '#E8C050', 'o': '#2E1010', 'p': '#F0E6CC'}),
+    'quill': (["....w.", "...ww.", "..ww..", ".ow...", "ooooo.", "oKKKo.", "oKKKo.", ".ooo.."],
+              {'w': '#F4F4F4', 'o': '#1E2230', 'K': '#3A4A8A'}),
+    'camera': ([".ooo..ooo..", "oRcRooRcRo.", ".ooo..ooo..", "ooooooooo.o", "oBBBBBBBoLo", "oBHHBBBBooo",
+                "ooooooooo.o"],
+               {'R': '#5A5A6A', 'c': '#B0B0C0', 'o': '#141418', 'B': '#3A3A48', 'H': '#6A6A80', 'L': '#8FD0FF'}),
+    'star': (["...y...", "..yyy..", "yyyyyyy", ".yyyyy.", "..yYy..", ".yy.yy.", "y.....y"],
+             {'y': '#FFD84A', 'Y': '#E8A820'}),
+    'gift': (["..w...w..", "...w.w...", "ooooooooo", "oPPPwPPPo", "ooooooooo", ".oPPwPPo.", ".oPPwPPo.", ".ooooooo."],
+             {'P': '#E86FB8', 'w': '#FFF0F8', 'o': '#6A2050'}),
+    'boot': (["oo....", "ob....", "ob....", "obbbo.", "obbbbo", "oooooo"],
+             {'o': '#2E1E10', 'b': '#6A4A2A'}),
+    'can': ([".sss.", "sSSSs", "sRRRs", "sRWRs", "sSSSs", ".sss."],
+            {'s': '#6E747C', 'S': '#C8CED6', 'R': '#C84A3A', 'W': '#F0E0D0'}),
+    'rocket': (["..w..", ".wWw.", ".wWw.", ".wBw.", ".wWw.", ".wWw.", "pwWwp", "pwwwp", "..f..", ".fFf.", "..F.."],
+               {'w': '#F2F2F6', 'W': '#C4C4D0', 'B': '#6AB8FF', 'p': '#E86FB8', 'f': '#FFD04A', 'F': '#FF7A3A'}),
+}
+
+
+def sprite_size(name):
+    rows, _ = SPRITES[name]
+    return max(len(r) for r in rows), len(rows)
+
+
+def sprite(cv, name, x, bottom, shadow=True):
+    """Draw a sprite with its bottom row on `bottom`, and a small shadow to its lower right."""
+    rows, colors = SPRITES[name]
+    y0 = bottom - len(rows) + 1
+    cells = {(x + gx, y0 + gy): colors[ch] for gy, line in enumerate(rows) for gx, ch in enumerate(line) if ch != '.'}
+    if shadow:
+        for (px, py) in cells:
+            if (px + 1, py + 1) not in cells and py + 1 <= bottom + 1:
+                cv.shade(px + 1, py + 1, (0, 0, 0, 255), 0.35)
+    for (px, py), c in cells.items():
+        cv.put(px, py, c)
+
+
+def roof_props(cv, sign, left, right, bottom=ROOF_Y + 8):
+    """Props standing on the roof on each side of the sign, packed outwards from it."""
+    x0, x1 = sign
+    x = x0 - 4
+    for name in left:
+        w, _ = sprite_size(name)
+        x -= w
+        if x < 11:
+            break
+        sprite(cv, name, x, bottom)
+        x -= 2
+    x = x1 + 4
+    for name in right:
+        w, _ = sprite_size(name)
+        if x + w > mirror(11):
+            break
+        sprite(cv, name, x, bottom)
+        x += w + 2
+
+
+def lantern(cv, x, y, light, core='#FFFFFF', chain_top=TOP + 23):
+    """An iron lantern hanging on a chain under the roof."""
+    for cy in range(chain_top, y):
+        cv.put(x + 2, cy, hexc('#3B3E46') if (cy - chain_top) % 2 == 0 else hexc('#1E2026'))
+    iron, dark = hexc('#2A2830'), hexc('#121016')
+    body = [".ooo.", "ooooo", "oGfGo", "oGFGo", "oGfGo", "ooooo", ".o.o."]
+    colors = {'o': iron, 'G': blend(hexc(light), dark, 0.45), 'f': hexc(light), 'F': hexc(core)}
+    for gy, line in enumerate(body):
+        for gx, ch in enumerate(line):
+            if ch != '.':
+                cv.put(x + gx, y + gy, colors[ch])
+    cv.put(x + 1, y, dark)
+    cv.put(x + 3, y, dark)
+
+
+def wall_torch(cv, x, y):
+    """A torch on a post: a flame over a short stick in an iron bracket."""
+    flame = ["..y..", ".yoy.", ".yor.", "..r.."]
+    colors = {'y': hexc('#FFE27A'), 'o': hexc('#FFA53A'), 'r': hexc('#E4572E')}
+    for gy, line in enumerate(flame):
+        for gx, ch in enumerate(line):
+            if ch != '.':
+                cv.put(x - 2 + gx, y + gy, colors[ch])
+    cv.vline(x, y + 4, y + 8, hexc('#7A4A24'))
+    cv.put(x, y + 4, hexc('#3A2412'))
+    cv.hline(x - 1, x + 1, y + 7, hexc('#2A2A30'))
+    cv.hline(x - 1, x + 1, y + 8, hexc('#1A1A20'))
+
+
+def bunting(cv, colors, y0=TOP + 24, sag=3):
+    """A string of pennants across the stall under the roof."""
+    string = hexc('#EDE6F2')
+    spans = [(9, 88), (88, mirror(9))]
+    k = 0
+    for a, b in spans:
+        for x in range(a, b + 1):
+            t = (x - a) / (b - a)
+            y = y0 + round(sag * math.sin(math.pi * t))
+            cv.put(x, y, string)
+            if (x - a) % 8 == 3 and b - x > 3:
+                c = hexc(colors[k % len(colors)])
+                edge = blend(c, (0, 0, 0, 255), 0.3)
+                for dy, half in ((1, 2), (2, 2), (3, 1), (4, 0)):
+                    for dx in range(-half, half + 1):
+                        cv.put(x + dx, y + dy, edge if abs(dx) == half and half else c)
+                k += 1
+
+
+def pinned_note(cv, x, y, pin, tilt=0):
+    """A parchment note pinned over a closed cupboard."""
+    paper, edge, ink, line = hexc('#EADCB6'), hexc('#7A5E3A'), hexc('#C8B283'), hexc('#8C7650')
+    x0, y0, x1, y1 = x + 3, y + 2 + tilt, x + 14, y + 13 + tilt
+    cv.rect(x0, y0, x1, y1, paper)
+    cv.hline(x0, x1, y0, edge)
+    cv.hline(x0, x1, y1, edge)
+    cv.vline(x0, y0, y1, edge)
+    cv.vline(x1, y0, y1, edge)
+    cv.vline(x1 - 1, y0 + 1, y1 - 1, ink)
+    for ly in range(y0 + 3, y1 - 1, 2):
+        cv.hline(x0 + 2, x1 - 3 - (ly % 3), ly, line)
+    cv.put((x0 + x1) // 2, y0, hexc(pin))
+    cv.put((x0 + x1) // 2, y0 + 1, blend(hexc(pin), (0, 0, 0, 255), 0.4))
+    cv.hline(x0 + 1, x1 + 1, y1 + 1, blend(cv.get(x0 + 1, y1 + 1), (0, 0, 0, 255), 0.3))
+
+
+def iron_band(cv, y):
+    """An iron strap round both posts, with rivets."""
+    for side in (0, 1):
+        f = (lambda x: x) if side == 0 else mirror
+        for x in range(POST_L, POST_L + 10):
+            cv.put(f(x), y, hexc('#6A707A'))
+            cv.put(f(x), y + 1, hexc('#34383F'))
+        for x in (POST_L + 2, POST_L + 7):
+            cv.put(f(x), y, hexc('#C4CAD2'))
+
+
+def fog(cv, ctx, color, height=8, strength=0.4):
+    """Coloured mist rising from the floor along the counter front."""
+    bottom = ctx['bottom']
+    for y in range(bottom - height, bottom + 1):
+        a = strength * ((y - (bottom - height)) / height) ** 1.5
+        for x in range(POST_L, mirror(POST_L) + 1):
+            if cv.is_stall(x, y):
+                cv.shade(x, y, color, a)
+
+
+def sparks(cv, points, color, core='#FFFFFF'):
+    """Tiny floating motes of light."""
+    for i, (x, y) in enumerate(points):
+        if cv.is_stall(x, y):
+            cv.put(x, y, core if i % 3 == 0 else color)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                cv.shade(x + dx, y + dy, color, 0.35)
+
+
+def shelf_candles(cv, ctx, cols):
+    """Candles standing on the shelf between cubbies (on the dividers, never over an item)."""
+    for c in cols:
+        x = slot_x(c) - 1
+        sprite(cv, 'candle', x, ctx['shelf'], shadow=False)
+        glow(cv, x + 1, ctx['shelf'] - 5, 6, '#FFB347', 0.35)
+
+
 # ------------------------------------------------------------------ layouts
 
 
 def stall(cv, menu):
+    theme = menu.get('theme', {})
     rows, buttons = menu['rows'], set(menu.get('buttons', []))
     boxes = menu.get('boxes', {})
     buttons |= set(boxes)
     cubby_rows = sorted({s // 9 for s in buttons})
     bottom = bottom_of(rows)
     draw_cover(cv, rows)
-    front_top = draw_unit(cv, cubby_rows, buttons, boxes)
+    front_top = draw_unit(cv, cubby_rows, buttons, boxes, theme.get('bays', {}))
     draw_wall(cv, TOP + 28, slot_y(cubby_rows[0]) - 2)
     draw_underside(cv)
     unit_top = slot_y(cubby_rows[0]) - 1
@@ -634,14 +998,23 @@ def stall(cv, menu):
         plaque(cv, slot_x(s % 9) + 9, front_top + 2, text)
     for s in menu.get('nav', []):
         draw_nav(cv, s)
-    draw_roof(cv)
-    draw_sign(cv, menu['title'])
+    boarded = [r * 9 + c for r in cubby_rows for c in range(1, 8) if r * 9 + c not in buttons]
+    ctx = {'front_top': front_top, 'bottom': bottom, 'shelf': front_top - 6, 'boarded': boarded,
+           'cubby_rows': cubby_rows}
+    for deco in theme.get('decor', []):
+        deco(cv, ctx)
+    draw_roof(cv, theme.get('roof', {}))
+    ctx['sign'] = draw_sign(cv, menu['title'], theme.get('sign'))
+    left, right = theme.get('props', ([], []))
+    roof_props(cv, ctx['sign'], left, right)
+    for deco in theme.get('lights', []):
+        deco(cv, ctx)
 
 
 def crate(cv, menu):
     """Every slot left open (players drop items anywhere): a crate of cubbies under a lid."""
+    theme = menu.get('theme', {})
     rows = menu['rows']
-    bottom = bottom_of(rows)
     x0, x1 = 4, W - 5
     top = slot_y(0) - 1
     last = slot_y(rows - 1)
@@ -656,7 +1029,16 @@ def crate(cv, menu):
     cv.hline(x0, x1, last + 20, 'd')
     cv.hline(x0 + 1, x1 - 1, last + 21, 'q')
     cv.hline(x0 + 1, x1 - 1, last + 22, 'q')
-    del bottom
+    if theme.get('iron_corners'):
+        iron, dark, rivet = hexc('#5E646E'), hexc('#2E3238'), hexc('#C4CAD2')
+        for (cx, cy, sx, sy) in ((x0, top, 1, 1), (x1, top, -1, 1), (x0, last + 20, 1, -1), (x1, last + 20, -1, -1)):
+            for i in range(7):
+                cv.put(cx + sx * i, cy, dark)
+                cv.put(cx, cy + sy * i, dark)
+                cv.put(cx + sx * i, cy + sy, iron)
+                cv.put(cx + sx, cy + sy * i, iron)
+            cv.put(cx + sx * 4, cy + sy, rivet)
+            cv.put(cx + sx, cy + sy * 4, rivet)
     # lid
     y0 = TOP + 3
     insets = [3, 2, 2, 1, 1, 0]
@@ -671,12 +1053,14 @@ def crate(cv, menu):
         cv.put(3, y, 'F')
         cv.put(mirror(3), y, 'F')
     cv.hline(4, mirror(4), top, 'x')
-    draw_sign(cv, menu['title'])
+    sign = draw_sign(cv, menu['title'], theme.get('sign'))
+    left, right = theme.get('props', ([], []))
+    roof_props(cv, sign, left, right, bottom=y0 + 4)
 
 
 LAYOUTS = {'stall': stall, 'crate': crate}
 
-# ------------------------------------------------------------------ menus
+# ------------------------------------------------------------------ themes
 
 GREEN = Box('frame', '#87BA65', '#5A823C', '#243B19', '#334D20', '#669448')
 GREEN_FLAT = Box('flat', '#87BA65', '#5A823C', '#243B19', '#334D20', '#669448')
@@ -685,29 +1069,135 @@ RED_FLAT = Box('flat', '#BA5D64', '#82353E', '#471616', '#5C2121', '#944047')
 GOLD = Box('lit', '#FFD160', '#67521F', '#67521F', '#876B28', '#876B28')
 PURPLE = Box('frame', '#A98AE0', '#6C4FA3', '#24163D', '#35255A', '#8468C2')
 PINK = Box('frame', '#EE93D6', '#A8528F', '#3A1230', '#58204A', '#C66DAE')
+CYAN = Box('frame', '#7FE0E0', '#3A9CA8', '#0F2E34', '#1A454E', '#58C0C8')
+
+OAK = tint(WOOD, WOOD_KEYS, hue=0.075, sat_mul=0.95, light_mul=1.07)
+SPRUCE = tint(WOOD, WOOD_KEYS, hue=0.065, sat_mul=0.72, light_mul=0.8)
+BIRCH = tint(WOOD, WOOD_KEYS, hue=0.1, sat_mul=0.55, light_mul=1.22)
+WALNUT = tint(WOOD, WOOD_KEYS, hue=0.02, sat_mul=0.8, light_mul=0.7, extra={'2': '#E8B84A'})
+IRONWOOD = tint(tint(WOOD, WOOD_KEYS, hue=0.08, sat_mul=0.45, light_mul=0.85),
+                ROOF_KEYS, hue=0.6, sat=0.04, light_mul=0.92)
+CRIMSON = tint(tint(WOOD, WOOD_KEYS, hue=0.985, sat_mul=1.1, light_mul=0.82),
+               ROOF_KEYS, hue=0.72, sat=0.07, light_mul=0.42, extra={'2': '#E0562E'})
+EBONY = tint(tint(WOOD, WOOD_KEYS, hue=0.77, sat=0.2, light_mul=0.55),
+             ROOF_KEYS, hue=0.77, sat=0.25, light_mul=0.5, extra={'2': '#9B5CFF', '1': '#1C1026'})
+LAVENDER = tint(WOOD, WOOD_KEYS, hue=0.8, sat=0.18, light_mul=1.02)
+
+SHOP = dict(
+    palette=OAK,
+    roof=dict(style='awning', stripe=8, hem='scallop',
+              ramps=[('#1E4A28', '#2F6B3A', '#3F8F4F', '#4FA861', '#6CC27C'),
+                     ('#7A6A48', '#C9BC98', '#E6DCC0', '#F1E9D2', '#FBF6E8')]),
+    props=(['barrel', 'crate'], ['coins_low', 'coins']),
+)
+
+BLACK_MARKET = dict(
+    palette=EBONY,
+    roof=dict(style='cloth', hem='ragged', ramps=[('#12081C', '#24123A', '#34195A', '#472675', '#5E3596')]),
+    sign=dict(letters=dict(face='#F4E6FF', band='#C9A0FF', overhang='#3A1E5A', edge='#6E3FB0', lip='#2E1A48'),
+              glow='#B070FF'),
+    bays={'*': 'curtain', 15: 'curtain_eyes'},
+    props=(['potion', 'skull'], ['potion_green', 'potion']),
+    decor=[lambda cv, ctx: shelf_candles(cv, ctx, (4, 5))],
+    lights=[
+        lambda cv, ctx: glow(cv, W // 2, TOP + 26, 60, '#6A3AB0', 0.22),
+        lambda cv, ctx: fog(cv, ctx, '#7A40D0', 9, 0.45),
+        lambda cv, ctx: [glow(cv, x, TOP + 33, 18, '#A060FF', 0.6) for x in (17, mirror(17))],
+        lambda cv, ctx: [lantern(cv, x, TOP + 30, '#C08AFF', '#FFFFFF') for x in (15, mirror(15) - 4)],
+        lambda cv, ctx: sparks(cv, [(22, TOP + 44), (27, TOP + 31), (150, TOP + 29), (155, TOP + 45),
+                                    (60, TOP + 31), (118, TOP + 32), (98, TOP + 30)], '#C9A0FF'),
+    ],
+)
+
+KILL_STREAKS = dict(
+    palette=CRIMSON,
+    roof=dict(style='slab', edge='#E8602E', glow_edge='#FF7A30'),
+    sign=dict(letters=dict(face='#FFE2B0', band='#FF9A3C', overhang='#5A1408', edge='#9A2A10', lip='#4A1008'),
+              glow='#FF6A2A'),
+    props=(['candle', 'skull'], ['skull', 'candle']),
+    lights=[
+        lambda cv, ctx: [wall_torch(cv, x, TOP + 41) for x in (POST_L + 4, mirror(POST_L + 4))],
+        lambda cv, ctx: [glow(cv, x, TOP + 43, 14, '#FF8A3A', 0.5) for x in (POST_L + 4, mirror(POST_L + 4))],
+    ],
+)
+
+MEDIA_RANK = dict(
+    palette=WALNUT,
+    roof=dict(style='velvet', hem='fringe', ramps=[('#3A0610', '#6E0F22', '#8E1830', '#A8223C', '#C23A55')]),
+    sign=dict(letters=dict(face='#FFE9A8', band='#E8B040', overhang='#5A3408', edge='#8A5A12', lip='#4A2E08'),
+              bulbs=True),
+    props=(['camera'], ['star']),
+    lights=[lambda cv, ctx: glow(cv, W // 2, 8, 40, '#FFD27A', 0.18)],
+)
+
+KITS = dict(
+    palette=IRONWOOD,
+    props=(['sword'], ['shield']),
+    decor=[lambda cv, ctx: [iron_band(cv, y) for y in (TOP + 46, ctx['front_top'] - 3)]],
+)
+
+SETTINGS = dict(
+    palette=slate(WOOD),
+    props=(['gear'], ['gear_small', 'gear']),
+    decor=[lambda cv, ctx: [iron_band(cv, y) for y in (TOP + 46, ctx['front_top'] - 3)]],
+)
+
+TRASH = dict(palette=SPRUCE, iron_corners=True, props=(['boot'], ['can']))
+
+MAP_SWITCHER = dict(
+    palette=BIRCH,
+    roof=dict(style='canvas', stripe=11, hem='rope',
+              ramps=[('#6A5A3A', '#B8A578', '#D8C9A0', '#E6DAB6', '#F2EAD0'),
+                     ('#5A4228', '#9A7E54', '#B89A6A', '#C8AC7C', '#D8BE90')]),
+    props=(['map'], ['globe']),
+)
+
+BOOSTER = dict(
+    palette=LAVENDER,
+    roof=dict(style='awning', stripe=8, hem='scallop',
+              ramps=[('#6A1E50', '#B8458E', '#E06AB2', '#EE8AC6', '#F8B0DA'),
+                     ('#6A5A7A', '#D8CCE6', '#EEE6F6', '#F6F0FB', '#FFFFFF')]),
+    sign=dict(letters=dict(face='#FFFFFF', band='#F7B0DC', overhang='#6A2A58', edge='#A8457E', lip='#5A2048'),
+              glow='#FF8AD0'),
+    props=(['gift'], ['rocket']),
+    decor=[lambda cv, ctx: bunting(cv, ['#E86FB8', '#A77BE0', '#FFFFFF'])],
+)
+
+COINFLIP = dict(palette=WOOD, props=(['coins_low', 'coins'], ['coins', 'coins_low']))
+
+QUESTS = dict(
+    palette=SPRUCE,
+    props=(['book'], ['quill']),
+    decor=[lambda cv, ctx: [pinned_note(cv, slot_x(s % 9), slot_y(s // 9), pin, tilt)
+                            for s, pin, tilt in zip(ctx['boarded'], ['#D93A3A', '#3F7FD9', '#E0A020', '#4CAF50', '#D93A3A'],
+                                                    [0, 1, 0, 1, 0])]],
+)
 
 MENUS = {
-    "shop_gui": dict(rows=3, buttons=[11, 12, 13, 14, 15], nav=[26], title="SHOP"),
-    "black_market_gui": dict(rows=3, buttons=[10, 12, 13, 14, 16], nav=[26], title="BLACK MARKET"),
-    "kill_streaks_gui": dict(rows=4, buttons=[12, 13, 14, 21, 22, 23], title="KILL STREAKS"),
-    "media_rank_gui": dict(rows=3, buttons=[12, 13, 14], nav=[22], title="MEDIA RANK"),
-    "kits_gui": dict(rows=3, buttons=[10, 11, 12, 13, 14, 15, 16], title="KITS"),
+    "shop_gui": dict(rows=3, buttons=[11, 12, 13, 14, 15], nav=[26], title="SHOP", theme=SHOP),
+    "black_market_gui": dict(rows=3, buttons=[10, 12, 13, 14, 16], nav=[26], title="BLACK MARKET",
+                             theme=BLACK_MARKET),
+    "kill_streaks_gui": dict(rows=4, buttons=[12, 13, 14, 21, 22, 23], title="KILL STREAKS", theme=KILL_STREAKS),
+    "media_rank_gui": dict(rows=3, boxes={12: RED, 13: PURPLE, 14: CYAN}, nav=[22], title="MEDIA RANK",
+                           theme=MEDIA_RANK),
+    "kits_gui": dict(rows=3, buttons=[10, 11, 12, 13, 14, 15, 16], title="KITS", theme=KITS),
     "settings_gui": dict(rows=4, buttons=[10, 11, 12, 14, 15, 16, 19, 20, 21, 23, 24, 25], nav=[31],
-                         title="SETTINGS"),
-    "trash_bin_gui": dict(rows=4, layout='crate', title="TRASH BIN"),
+                         title="SETTINGS", theme=SETTINGS),
+    "trash_bin_gui": dict(rows=4, layout='crate', title="TRASH BIN", theme=TRASH),
     "map_switcher_gui": dict(rows=3, title="CURRENT MAP", boxes={10: GREEN, 13: PURPLE, 16: RED},
-                             plaques={10: "TELEPORT", 13: "MAP INFO", 16: "CANCEL"}),
-    "booster_gui": dict(rows=3, title="BOOSTER REWARDS", boxes={11: PINK, 13: PINK, 15: PINK},
-                        plaques={11: "DAILY", 13: "WEEKLY", 15: "MONTHLY"}),
+                             plaques={10: "TELEPORT", 13: "MAP INFO", 16: "CANCEL"}, theme=MAP_SWITCHER),
+    "booster_gui": dict(rows=3, title="BOOST REWARDS", boxes={11: PINK, 13: PINK, 15: PINK},
+                        plaques={11: "DAILY", 13: "WEEKLY", 15: "MONTHLY"}, theme=BOOSTER),
     "coinflip_gui": dict(rows=3, title="COINFLIP",
-                         boxes={10: GREEN, 11: GREEN_FLAT, 12: GREEN, 13: GOLD, 14: RED, 15: RED_FLAT, 16: RED}),
-    "quests_gui": dict(rows=3, buttons=[12, 14], title="QUESTS"),
+                         boxes={10: GREEN, 11: GREEN_FLAT, 12: GREEN, 13: GOLD, 14: RED, 15: RED_FLAT, 16: RED},
+                         theme=COINFLIP),
+    "quests_gui": dict(rows=3, buttons=[12, 14], title="QUESTS", theme=QUESTS),
 }
 
 
-def render(name, palette=WOOD):
+def render(name):
     menu = MENUS[name]
-    cv = Canvas(W, bottom_of(menu['rows']) + 3, palette)
+    cv = Canvas(W, bottom_of(menu['rows']) + 3, menu.get('theme', {}).get('palette', WOOD))
     LAYOUTS[menu.get('layout', 'stall')](cv, menu)
     return cv.img
 
@@ -803,17 +1293,16 @@ def main():
     os.makedirs(out, exist_ok=True)
     os.makedirs(out_preview, exist_ok=True)
     sizes = {}
-    for suffix, palette in PALETTES.items():
-        shots = []
-        for name, menu in MENUS.items():
-            img = render(name, palette)
-            img.save(os.path.join(out, name + suffix + ".png"))
-            slots, nav = item_slots(menu)
-            shot = preview(img, menu['rows'], slots, nav)
-            shot.save(os.path.join(out_preview, name + suffix + ".png"))
-            shots.append(shot.resize((shot.width // 2, shot.height // 2), Image.NEAREST))
-            sizes[name + suffix] = {"rows": menu['rows'], "height": img.height, "ascent": 13 + TOP}
-        contact_sheet(shots).save(os.path.join(out_preview, "all_menus" + suffix + ".png"))
+    shots = []
+    for name, menu in MENUS.items():
+        img = render(name)
+        img.save(os.path.join(out, name + ".png"))
+        slots, nav = item_slots(menu)
+        shot = preview(img, menu['rows'], slots, nav)
+        shot.save(os.path.join(out_preview, name + ".png"))
+        shots.append(shot.resize((shot.width // 2, shot.height // 2), Image.NEAREST))
+        sizes[name] = {"rows": menu['rows'], "height": img.height, "ascent": 13 + TOP}
+    contact_sheet(shots).save(os.path.join(out_preview, "all_menus.png"))
     return sizes
 
 

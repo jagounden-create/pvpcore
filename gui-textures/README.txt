@@ -1,11 +1,25 @@
 NEXO MENU BACKGROUNDS AND HOLOGRAM LOGOS
 ========================================
 
-Eleven menu backgrounds drawn as a wooden market stall (a carved sign on a slab roof,
-cubbies on a shelf, a panelled counter with drawers), each in two colours:
-wood (shop_gui) and slate grey (shop_gui_gray). Plus nine 3D hologram logos.
-Everything is pixel art at Minecraft's own scale, so each cubby sits exactly under the item
-your menu puts in that slot, and the logos stay crisp at any size.
+Eleven menu backgrounds drawn as market stalls (a carved sign on a roof, cubbies on a shelf,
+a panelled counter with drawers), each with its own theme:
+
+  shop           oak stall, green and cream striped awning, barrel, crate and coins
+  black market   ebony stall under a ragged purple cloth, glowing violet sign, soul
+                 lanterns, candles, curtained cupboards (something is watching), potions
+  kill streaks   crimson wood, blackstone roof with a glowing edge, fiery sign, torches, skulls
+  media rank     walnut stall, red velvet roof with gold fringe, marquee light-bulb sign,
+                 YouTube red / Twitch purple / TikTok cyan boxes, camera and star
+  kits           grey ironwood, stone roof, iron-banded posts, sword and shield
+  settings       slate grey, iron bands, gears
+  trash bin      spruce crate with iron corners, every slot open
+  map switcher   birch stall, canvas roof, map and globe, coloured action boxes with labels
+  booster        lavender stall, pink striped awning, bunting, gift and rocket, labels
+  coinflip       the classic wooden stall, green / gold / red boxes, stacks of coins
+  quests         spruce stall, notes pinned on the closed cupboards, book and quill
+
+Plus nine 3D hologram logos. Everything is pixel art at Minecraft's own scale, so each cubby
+sits exactly under the item your menu puts in that slot, and the logos stay crisp at any size.
 
   MENU               ROWS  ITEMS IN SLOTS                      BACK/CLOSE
   shop_gui           3     11 12 13 14 15                      26
@@ -56,8 +70,8 @@ MENUS
 Set each menu's title to its picture, pulled 8 pixels left to line up with the menu's edge.
 The sign text is part of the picture, so the title is only the glyph:
 
-    <white><shift:-8><glyph:shop_gui>          wood
-    <white><shift:-8><glyph:shop_gui_gray>     slate grey
+    <white><shift:-8><glyph:shop_gui>
+    <white><shift:-8><glyph:black_market_gui>
     ...and so on, with the menu's name from the table above.
 
 If your menu plugin can't pass Nexo's tags through, use Nexo's PlaceholderAPI placeholders:
@@ -106,8 +120,8 @@ CHANGING THEM
 -------------
 Everything is drawn by the Python scripts here (Python 3 + Pillow: pip install pillow).
 
-  generate.py    the menus. MENUS lists each menu's rows, slots and sign text; WOOD holds
-                 the colours (the grey set is made from it).
+  generate.py    the menus. MENUS lists each menu's rows, slots, sign text and theme; the
+                 themes (wood, roof, sign, props, lights) are just above it.
   holograms.py   the logos. LOGOS lists each logo's lines; the colours are at the top.
   package.py     runs both, writes the glyph configs and builds nexo-gui-pack.zip.
 
@@ -121,8 +135,8 @@ To add a logo: add a line to LOGOS, e.g.  "holo_spawn": [("SPAWN", BIG)],
 FILES
 -----
 nexo-gui-pack.zip   everything to install, laid out like plugins/Nexo/
-textures/           the menu PNGs (wood, and _gray)
+textures/           the menu PNGs
 holograms/          the logo PNGs
 nexo/               the glyph configs
 previews/           4x pictures of the menus with stand-in items, and the logos
-                    (all_menus.png, all_menus_gray.png, all_holograms.png)
+                    (all_menus.png, all_holograms.png)
