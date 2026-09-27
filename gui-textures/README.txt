@@ -1,7 +1,9 @@
 NEXO MENU BACKGROUNDS AND HOLOGRAM LOGOS
 ========================================
 
-Eleven menu backgrounds in one clean slate-grey style, plus nine 3D hologram logos.
+Eleven menu backgrounds drawn as a wooden market stall (a carved sign on a slab roof,
+cubbies on a shelf, a panelled counter with drawers), each in two colours:
+wood (shop_gui) and slate grey (shop_gui_gray). Plus nine 3D hologram logos.
 Everything is pixel art at Minecraft's own scale, so each cubby sits exactly under the item
 your menu puts in that slot, and the logos stay crisp at any size.
 
@@ -54,14 +56,15 @@ MENUS
 Set each menu's title to its picture, pulled 8 pixels left to line up with the menu's edge.
 The sign text is part of the picture, so the title is only the glyph:
 
-    <white><shift:-8><glyph:shop_gui>
-    <white><shift:-8><glyph:settings_gui>
+    <white><shift:-8><glyph:shop_gui>          wood
+    <white><shift:-8><glyph:shop_gui_gray>     slate grey
     ...and so on, with the menu's name from the table above.
 
 If your menu plugin can't pass Nexo's tags through, use Nexo's PlaceholderAPI placeholders:
     %nexo_shift_-8%%nexo_shop_gui%
 
-- Keep the items in the slots listed above, and the row counts the same.
+- Keep the items in the slots listed above, and the row counts the same. Slots of the
+  shelf that have no item show as closed cupboard doors.
 - Leave every other slot EMPTY (no glass-pane filler): the picture already covers the
   menu's slot grid, and any item would sit on top of it. (The trash bin is the exception:
   it shows every slot, so players can drop items anywhere.)
@@ -103,8 +106,8 @@ CHANGING THEM
 -------------
 Everything is drawn by the Python scripts here (Python 3 + Pillow: pip install pillow).
 
-  generate.py    the menus. MENUS lists each menu's rows, slots and sign text; the slate
-                 colours are in the palette section near the top.
+  generate.py    the menus. MENUS lists each menu's rows, slots and sign text; WOOD holds
+                 the colours (the grey set is made from it).
   holograms.py   the logos. LOGOS lists each logo's lines; the colours are at the top.
   package.py     runs both, writes the glyph configs and builds nexo-gui-pack.zip.
 
@@ -118,7 +121,8 @@ To add a logo: add a line to LOGOS, e.g.  "holo_spawn": [("SPAWN", BIG)],
 FILES
 -----
 nexo-gui-pack.zip   everything to install, laid out like plugins/Nexo/
-textures/           the menu PNGs
+textures/           the menu PNGs (wood, and _gray)
 holograms/          the logo PNGs
 nexo/               the glyph configs
 previews/           4x pictures of the menus with stand-in items, and the logos
+                    (all_menus.png, all_menus_gray.png, all_holograms.png)

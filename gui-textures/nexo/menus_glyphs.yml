@@ -1,58 +1,113 @@
-# Menu backgrounds. The image starts 8 px above the menu (for the sign):
-# ascent = 13 + 8, height = the image's height, so it shows at 1:1 scale.
+# Menu backgrounds. The image starts 6 px above the menu (for the sign):
+# ascent = 13 + 6, height = the image's height, so it shows at 1:1 scale.
 # Title of each menu:  <white><shift:-8><glyph:ID>
 
 shop_gui:
   texture: menus/shop_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 black_market_gui:
   texture: menus/black_market_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 kill_streaks_gui:
   texture: menus/kill_streaks_gui
-  ascent: 21
+  ascent: 19
   height: 100
 
 media_rank_gui:
   texture: menus/media_rank_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 kits_gui:
   texture: menus/kits_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 settings_gui:
   texture: menus/settings_gui
-  ascent: 21
+  ascent: 19
   height: 100
 
 trash_bin_gui:
   texture: menus/trash_bin_gui
-  ascent: 21
+  ascent: 19
   height: 100
 
 map_switcher_gui:
   texture: menus/map_switcher_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 booster_gui:
   texture: menus/booster_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 coinflip_gui:
   texture: menus/coinflip_gui
-  ascent: 21
+  ascent: 19
   height: 82
 
 quests_gui:
   texture: menus/quests_gui
-  ascent: 21
+  ascent: 19
+  height: 82
+
+shop_gui_gray:
+  texture: menus/shop_gui_gray
+  ascent: 19
+  height: 82
+
+black_market_gui_gray:
+  texture: menus/black_market_gui_gray
+  ascent: 19
+  height: 82
+
+kill_streaks_gui_gray:
+  texture: menus/kill_streaks_gui_gray
+  ascent: 19
+  height: 100
+
+media_rank_gui_gray:
+  texture: menus/media_rank_gui_gray
+  ascent: 19
+  height: 82
+
+kits_gui_gray:
+  texture: menus/kits_gui_gray
+  ascent: 19
+  height: 82
+
+settings_gui_gray:
+  texture: menus/settings_gui_gray
+  ascent: 19
+  height: 100
+
+trash_bin_gui_gray:
+  texture: menus/trash_bin_gui_gray
+  ascent: 19
+  height: 100
+
+map_switcher_gui_gray:
+  texture: menus/map_switcher_gui_gray
+  ascent: 19
+  height: 82
+
+booster_gui_gray:
+  texture: menus/booster_gui_gray
+  ascent: 19
+  height: 82
+
+coinflip_gui_gray:
+  texture: menus/coinflip_gui_gray
+  ascent: 19
+  height: 82
+
+quests_gui_gray:
+  texture: menus/quests_gui_gray
+  ascent: 19
   height: 82
