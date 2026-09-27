@@ -1,27 +1,40 @@
 NEXO MENU BACKGROUNDS AND HOLOGRAM LOGOS
 ========================================
 
-Six menu backgrounds in one wooden-stall style, plus six 3D hologram logos. Everything is
-pixel art at Minecraft's own scale, so each cubby sits exactly under the item your menu puts
-in that slot, and the logos stay crisp at any size.
+Eleven menu backgrounds in one clean slate-grey style, plus nine 3D hologram logos.
+Everything is pixel art at Minecraft's own scale, so each cubby sits exactly under the item
+your menu puts in that slot, and the logos stay crisp at any size.
 
-  MENU               ROWS  BUTTON SLOTS              BACK BUTTON
-  coinflip_gui       3     10 11 12 13 14 15 16      -
-  shop_gui           3     11 12 13 14 15            26
-  black_market_gui   3     10 12 13 14 16            26
-  kill_streaks_gui   4     12 13 14 21 22 23         -
-  quests_gui         3     12 14                     -
-  media_rank_gui     3     12 13 14                  22
+  MENU               ROWS  ITEMS IN SLOTS                      BACK/CLOSE
+  shop_gui           3     11 12 13 14 15                      26
+  black_market_gui   3     10 12 13 14 16                      26
+  kill_streaks_gui   4     12 13 14 21 22 23                   -
+  media_rank_gui     3     12 13 14                            22
+  kits_gui           3     10 11 12 13 14 15 16                -
+  settings_gui       4     10 11 12 14 15 16 19 20 21 23 24 25 31
+  trash_bin_gui      4     every slot stays open to drop items -
+  map_switcher_gui   3     10 teleport, 13 map info, 16 cancel -
+  booster_gui        3     11 daily, 13 weekly, 15 monthly     -
+  coinflip_gui       3     10 11 12 13 14 15 16                -
+  quests_gui         3     12 14                               -
 
   (Slots count from 0 in the top-left, 9 per row - the same numbers DeluxeMenus uses.)
+
+  booster_gui matches the BoostRewards menu's slots (AxRewards / mc-DiscordLink:
+  rows 3, daily 11, weekly 13, monthly 15). Only its title changes:
+      title: "&f<shift:-8><glyph:booster_gui>"          (AxRewards menus/boost-rewards.yml)
+      menu-title: "&f<shift:-8><glyph:booster_gui>"     (mc-DiscordLink guis.yml)
 
   HOLOGRAM           TEXT
   holo_shop          SHOP
   holo_coinflip      COINFLIP
   holo_quests        QUESTS
+  holo_kits          KITS
   holo_black_market  BLACK / market
   holo_kill_streaks  KILL / streaks
   holo_media_rank    MEDIA / rank
+  holo_trash_bin     TRASH / bin
+  holo_booster       BOOSTER / rewards
 
 
 INSTALL
@@ -41,19 +54,17 @@ MENUS
 Set each menu's title to its picture, pulled 8 pixels left to line up with the menu's edge.
 The sign text is part of the picture, so the title is only the glyph:
 
-    coinflip:      <white><shift:-8><glyph:coinflip_gui>
-    shop:          <white><shift:-8><glyph:shop_gui>
-    black market:  <white><shift:-8><glyph:black_market_gui>
-    kill streaks:  <white><shift:-8><glyph:kill_streaks_gui>
-    quests:        <white><shift:-8><glyph:quests_gui>
-    media rank:    <white><shift:-8><glyph:media_rank_gui>
+    <white><shift:-8><glyph:shop_gui>
+    <white><shift:-8><glyph:settings_gui>
+    ...and so on, with the menu's name from the table above.
 
 If your menu plugin can't pass Nexo's tags through, use Nexo's PlaceholderAPI placeholders:
-    %nexo_shift_-8%%nexo_coinflip_gui%
+    %nexo_shift_-8%%nexo_shop_gui%
 
-- Keep the buttons in the slots listed above. Kill streaks must be 4 rows, the rest 3 rows.
-- Leave every other slot of the menu EMPTY (no glass-pane filler): the picture already
-  covers the menu's slot grid, and any item would sit on top of it.
+- Keep the items in the slots listed above, and the row counts the same.
+- Leave every other slot EMPTY (no glass-pane filler): the picture already covers the
+  menu's slot grid, and any item would sit on top of it. (The trash bin is the exception:
+  it shows every slot, so players can drop items anywhere.)
 - Your own inventory below the menu is left as it is.
 
 
@@ -92,14 +103,15 @@ CHANGING THEM
 -------------
 Everything is drawn by the Python scripts here (Python 3 + Pillow: pip install pillow).
 
-  generate.py    the menus. MENUS lists each menu's rows, button slots and sign text;
-                 THEMES sets its wood, roof, cubby colours and decorations.
+  generate.py    the menus. MENUS lists each menu's rows, slots and sign text; the slate
+                 colours are in the palette section near the top.
   holograms.py   the logos. LOGOS lists each logo's lines; the colours are at the top.
   package.py     runs both, writes the glyph configs and builds nexo-gui-pack.zip.
 
   python3 package.py
 
-To add a menu: add a line to MENUS with its slots (and a theme), then run package.py.
+To add a menu: add a line to MENUS with its rows, slots and title, then run package.py.
+  e.g.  "warps_gui": dict(rows=3, buttons=[11, 13, 15], title="WARPS"),
 To add a logo: add a line to LOGOS, e.g.  "holo_spawn": [("SPAWN", BIG)],
 
 

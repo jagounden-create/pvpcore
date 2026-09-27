@@ -31,3 +31,18 @@ holo_media_rank:
   texture: holograms/holo_media_rank
   ascent: 65
   height: 65
+
+holo_kits:
+  texture: holograms/holo_kits
+  ascent: 37
+  height: 37
+
+holo_trash_bin:
+  texture: holograms/holo_trash_bin
+  ascent: 65
+  height: 65
+
+holo_booster:
+  texture: holograms/holo_booster
+  ascent: 65
+  height: 65

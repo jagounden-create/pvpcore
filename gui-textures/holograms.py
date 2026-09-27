@@ -119,6 +119,9 @@ LOGOS = {
     "holo_black_market": [("BLACK", BIG), ("MARKET", SMALL)],
     "holo_kill_streaks": [("KILL", BIG), ("STREAKS", SMALL)],
     "holo_media_rank": [("MEDIA", BIG), ("RANK", SMALL)],
+    "holo_kits": [("KITS", BIG)],
+    "holo_trash_bin": [("TRASH", BIG), ("BIN", SMALL)],
+    "holo_booster": [("BOOSTER", BIG), ("REWARDS", SMALL)],
 }
 
 
