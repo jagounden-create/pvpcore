@@ -1,0 +1,48 @@
+# Hologram logos. ascent = height, so the logo sits on top of its hologram line.
+# Lower height (keep ascent equal to it) for a smaller logo, or scale the hologram.
+# Hologram line:  %nexo_ID%   (needs PlaceholderAPI)
+
+holo_shop:
+  texture: holograms/holo_shop
+  ascent: 37
+  height: 37
+
+holo_coinflip:
+  texture: holograms/holo_coinflip
+  ascent: 37
+  height: 37
+
+holo_quests:
+  texture: holograms/holo_quests
+  ascent: 37
+  height: 37
+
+holo_black_market:
+  texture: holograms/holo_black_market
+  ascent: 65
+  height: 65
+
+holo_kill_streaks:
+  texture: holograms/holo_kill_streaks
+  ascent: 65
+  height: 65
+
+holo_media_rank:
+  texture: holograms/holo_media_rank
+  ascent: 65
+  height: 65
+
+holo_kits:
+  texture: holograms/holo_kits
+  ascent: 37
+  height: 37
+
+holo_trash_bin:
+  texture: holograms/holo_trash_bin
+  ascent: 65
+  height: 65
+
+holo_booster:
+  texture: holograms/holo_booster
+  ascent: 65
+  height: 65

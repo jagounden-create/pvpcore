@@ -1,0 +1,53 @@
+# ============================================================================
+#  Item rules - nerf, cooldown, disable or limit any item or block
+#
+#  Easiest in game: /pvpcore -> Item Rules, then click any item in your own
+#  inventory to add a rule for it. Or by command:
+#    /pvpcore rule <item> <setting> <value>
+#    /pvpcore rule ender_pearl cooldown 15
+#    /pvpcore rule netherite_sword damage 0.9
+#    /pvpcore rule cobweb player-limit 8
+#    /pvpcore rule <item> remove
+#
+#  Settings for each item (leave out any you don't need):
+#    damage: 0.8       damage dealt with it is multiplied by this: melee hits,
+#                      arrows a bow or crossbow shoots, a trident, or the blast
+#                      of a crystal, TNT, TNT cart, anchor or bed. 1.0 = normal
+#    max-damage: 10    the most one hit with it can deal, in hearts, before
+#                      armor. 0 = no cap
+#    cooldown: 15      seconds before it can be used again. It starts when the
+#                      item is eaten, drunk, thrown, shot, placed, emptied,
+#                      used to boost an elytra or popped (totems); weapons
+#                      (swords, axes, maces, spears, tridents) start it when
+#                      they hit, and can't hit again until it ends
+#    disabled: true    can't be used at all
+#    chunk-limit: 16   blocks only: the most of this block one chunk can hold
+#    player-limit: 8   blocks only: the most of this block one player can have
+#                      placed at once
+#    worlds: [arena]   only in these worlds. Leave out for every world
+#
+#  Players with pvpcore.bypass.rules, and players in creative or spectator,
+#  are never affected. Cooldowns survive relogging.
+# ============================================================================
+
+# false = damage rules only change hits on players; true = on mobs as well.
+affect-mobs: false
+
+rules: {}
+# Examples - copy under "rules:" (and remove the {}) to use them:
+#
+# rules:
+#   ENCHANTED_GOLDEN_APPLE:
+#     cooldown: 30
+#   ENDER_PEARL:
+#     cooldown: 10
+#   COBWEB:
+#     player-limit: 8
+#     chunk-limit: 32
+#   NETHERITE_SWORD:
+#     damage: 0.9
+#   MACE:
+#     max-damage: 15
+#   END_CRYSTAL:
+#     disabled: true
+#     worlds: [arena]
