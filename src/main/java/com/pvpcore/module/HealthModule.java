@@ -7,6 +7,7 @@ import com.pvpcore.util.Text;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,6 +49,9 @@ public final class HealthModule extends Module {
    /** What each board last showed for each player ({@link #key}), so unchanged scores are not re-sent. */
    private final Map<Scoreboard, Map<UUID, Long>> shown = new ConcurrentHashMap<>();
    private final Set<UUID> dirty = ConcurrentHashMap.newKeySet();
+   /** Target health bars to send at the end of this tick: one per attacker, for the last thing they hit. */
+   private final Map<Player, LivingEntity> bars = new LinkedHashMap<>();
+   private boolean barsQueued;
    private BukkitTask ticker;
    private int ticks;
 
@@ -76,6 +80,7 @@ public final class HealthModule extends Module {
          this.ticker.cancel();
       }
 
+      this.bars.clear();
       this.removeObjectives();
    }
 
@@ -289,13 +294,25 @@ public final class HealthModule extends Module {
          && !victim.hasMetadata("NPC")) {
          Player attacker = this.plugin.attacker(event);
          if (attacker != null && !attacker.equals(victim)) {
-            Bukkit.getScheduler().runTask(this.plugin, () -> {
-               if (attacker.isOnline()) {
-                  attacker.sendActionBar(healthBar(victim));
-               }
-            });
+            // Sent once the damage is applied. A blast that hits ten players sends one bar, not ten.
+            this.bars.put(attacker, victim);
+            if (!this.barsQueued) {
+               this.barsQueued = true;
+               Bukkit.getScheduler().runTask(this.plugin, this::sendBars);
+            }
          }
       }
+   }
+
+   private void sendBars() {
+      this.barsQueued = false;
+      for (Map.Entry<Player, LivingEntity> bar : this.bars.entrySet()) {
+         if (bar.getKey().isOnline()) {
+            bar.getKey().sendActionBar(healthBar(bar.getValue()));
+         }
+      }
+
+      this.bars.clear();
    }
 
    static Component healthBar(LivingEntity victim) {

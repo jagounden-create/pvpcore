@@ -22,6 +22,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.entity.minecart.ExplosiveMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
@@ -53,7 +54,10 @@ public final class CartModule extends Module {
    static final double MERGE_DISTANCE = 1.5;
    /** A cart set off by another cart's blast in the same tick, this close, counts as lit by the same weapon. */
    static final double CHAIN_DISTANCE = 8.0;
+   /** Burning arrows: only a burning arrow can set a cart off, so plain arrows are never followed. */
    private final Map<UUID, Trail> arrows = new HashMap<>();
+   /** Arrows that were not burning at launch, looked at once more on the next tick in case they were lit just after. */
+   private final List<AbstractArrow> unlit = new ArrayList<>();
    /** What lit each cart: a bow or a crossbow arrow. Kept for the tick of the blast. */
    private final Map<UUID, Ignition> ignitions = new HashMap<>();
    /** Blasts that happened this tick, for merging and chain reactions. */
@@ -76,6 +80,7 @@ public final class CartModule extends Module {
    public void apply() {
       if (!this.on(Feature.CART_HIT_REG)) {
          this.arrows.clear();
+         this.unlit.clear();
          this.pending.clear();
       }
    }
@@ -87,6 +92,7 @@ public final class CartModule extends Module {
       }
 
       this.arrows.clear();
+      this.unlit.clear();
       this.carts.clear();
       this.pending.clear();
       this.ignitions.clear();
@@ -112,6 +118,16 @@ public final class CartModule extends Module {
       int now = Bukkit.getCurrentTick();
       if (!this.ignitions.isEmpty()) {
          this.ignitions.values().removeIf(ignition -> now - ignition.tick() > 2);
+      }
+
+      if (!this.unlit.isEmpty()) {
+         for (AbstractArrow arrow : this.unlit) {
+            if (arrow.isValid() && arrow.getFireTicks() > 0) {
+               this.follow(arrow, now);
+            }
+         }
+
+         this.unlit.clear();
       }
 
       if (this.arrows.isEmpty() && this.carts.isEmpty() && this.pending.isEmpty()) {
@@ -270,8 +286,26 @@ public final class CartModule extends Module {
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onLaunch(ProjectileLaunchEvent event) {
-      if (event.getEntity() instanceof AbstractArrow arrow && !(arrow instanceof Trident) && this.on(Feature.CART_HIT_REG) && this.arrows.size() < MAX_TRACKED_ARROWS) {
-         this.arrows.put(arrow.getUniqueId(), new Trail(arrow, Bukkit.getCurrentTick()));
+      if (event.getEntity() instanceof AbstractArrow arrow && !(arrow instanceof Trident) && this.on(Feature.CART_HIT_REG)) {
+         if (arrow.getFireTicks() > 0) {
+            this.follow(arrow, Bukkit.getCurrentTick());
+         } else if (this.unlit.size() < MAX_TRACKED_ARROWS) {
+            this.unlit.add(arrow);
+         }
+      }
+   }
+
+   /** An arrow flying through fire or lava catches light mid-air. */
+   @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+   public void onArrowLit(EntityCombustEvent event) {
+      if (event.getEntity() instanceof AbstractArrow arrow && !(arrow instanceof Trident) && this.on(Feature.CART_HIT_REG)) {
+         this.follow(arrow, Bukkit.getCurrentTick());
+      }
+   }
+
+   private void follow(AbstractArrow arrow, int now) {
+      if (this.arrows.size() < MAX_TRACKED_ARROWS && !this.arrows.containsKey(arrow.getUniqueId())) {
+         this.arrows.put(arrow.getUniqueId(), new Trail(arrow, now));
       }
    }
 

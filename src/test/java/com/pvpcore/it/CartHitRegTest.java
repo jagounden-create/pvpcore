@@ -31,12 +31,23 @@ class CartHitRegTest extends PluginTest {
    }
 
    Arrow flyThrough(PlayerMock shooter, double z, double... xs) {
+      return this.flyThrough(shooter, true, z, xs);
+   }
+
+   Arrow flyThrough(PlayerMock shooter, boolean litAtLaunch, double z, double... xs) {
       FlyingArrow arrow = new FlyingArrow(this.server);
       arrow.setLocation(new Location(this.world, xs[0], 64.3, z));
       this.server.registerEntity(arrow);
       arrow.setShooter(shooter);
-      arrow.setFireTicks(200);
+      if (litAtLaunch) {
+         arrow.setFireTicks(200);
+      }
+
       this.call(new ProjectileLaunchEvent(arrow));
+      if (!litAtLaunch) {
+         arrow.setFireTicks(200); // lit just after launch, before the next tick
+      }
+
       for (double x : xs) {
          arrow.teleport(new Location(this.world, x, 64.3, z));
          this.ticks(1);
@@ -59,6 +70,35 @@ class CartHitRegTest extends PluginTest {
       this.ticks(1);
       assertFalse(arrow.isValid(), "the arrow was used up by the hit");
       assertFalse(cart.isValid() && !cart.isDead(), "the cart went off");
+   }
+
+   @Test
+   void anArrowLitJustAfterLaunchStillCounts() {
+      PlayerMock player = this.server.addPlayer();
+      Arrow arrow = this.flyThrough(player, false, 0.5, -3, 3);
+      ExplosiveMinecart cart = this.placeCart(player);
+      this.ticks(1);
+      assertFalse(arrow.isValid(), "the arrow was used up by the hit");
+      assertFalse(cart.isValid() && !cart.isDead(), "the cart went off");
+   }
+
+   @Test
+   void aPlainArrowNeverSetsACartOff() {
+      PlayerMock player = this.server.addPlayer();
+      FlyingArrow arrow = new FlyingArrow(this.server);
+      arrow.setLocation(new Location(this.world, -3, 64.3, 0.5));
+      this.server.registerEntity(arrow);
+      arrow.setShooter(player);
+      this.call(new ProjectileLaunchEvent(arrow));
+      for (double x : new double[]{-3, 3}) {
+         arrow.teleport(new Location(this.world, x, 64.3, 0.5));
+         this.ticks(1);
+      }
+
+      ExplosiveMinecart cart = this.placeCart(player);
+      this.ticks(1);
+      assertTrue(arrow.isValid());
+      assertTrue(cart.isValid());
    }
 
    @Test

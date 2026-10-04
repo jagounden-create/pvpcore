@@ -7,7 +7,7 @@ Smoother PvP for Paper servers: **Sword**, **Mace**, **Spear**, **Cart** and **D
 
 ## Install
 
-1. Put `PvPCore-3.1.0.jar` in `plugins/` and restart (not `/reload`).
+1. Put `PvPCore-3.2.0.jar` in `plugins/` and restart (not `/reload`).
 2. Run `/pvpcore` in game, or pick a starting point with `/pvpcore preset <diamond-smp|sword|mace|ffa|cart|vanilla>`.
 
 Updating? Keep your `plugins/PvPCore` folder. Your `config.yml` keeps every value and gains the new settings automatically.
@@ -179,7 +179,19 @@ Rules live in `plugins/PvPCore/rules.yml`. Creative/spectator players and `pvpco
 - **Instant Knockback** needs a Leaf server; elsewhere it shows as unavailable.
 - **Attribute Swapping** uses Paper's own switch when the server has one. Where it doesn't, PvPCore keeps the swapped-from item's damage and attack speed for the one hit made in the swap tick, then removes it again. If PaperAttributeSwapFix is installed, PvPCore leaves it to that plugin; you can remove it.
 - **Ghost Shields and the Golden Apple Fix** re-send just the changed state through the server's internal network classes, checked at startup. If those are not the expected ones, golden hearts are fixed by re-showing the player (a short blink), and shields only re-send the held items. `/pvpcore status` shows which is in use, plus how many fixes ran.
-- **Presets:** `ffa` is for mace and spear free-for-all: vanilla knockback distance and lift, smash fall safety, mace and spear-charge damage caps, lunge cooldown, combat tag and instant respawn, with every ghost and pearl fix on.
+- **Presets:** `ffa` is for mace and spear free-for-all: vanilla knockback distance and lift, smash fall safety, mace and spear-charge damage caps, lunge cooldown, Wind Charge Stop and Instant Wind Jump, combat tag and instant respawn, with every ghost and pearl fix on.
+
+## Performance
+
+PvPCore is built for busy FFA servers. Nothing heavy runs per player per tick:
+- Every switch check is a plain array read; handlers bail out before doing any work when their switch is off.
+- Item rules cost nothing (no permission checks, no projectile tagging) until at least one rule exists.
+- Cart hit reg only follows burning arrows; plain arrows are never tracked.
+- Health under names reads each player once per pass, not once per scoreboard, and only re-sends lines that changed.
+- Target health bars are batched to one per attacker per tick, so a blast that hits ten players sends one bar.
+- Arrow cleanup is one timer, not a task per arrow.
+- The ghost scanner reads each player's position and view distance once per scan, honours each world's own tracking range, and only flags a pair missing on two scans in a row.
+- Spent cooldowns, notices and block lists of players who left are forgotten, so nothing grows over long uptimes.
 
 ## Building
 
@@ -187,4 +199,4 @@ Rules live in `plugins/PvPCore/rules.yml`. Creative/spectator players and `pvpco
 mvn package
 ```
 
-This produces `target/PvPCore-3.1.0.jar`. The build runs 110 tests, including full-plugin tests on a simulated Paper server (MockBukkit).
+This produces `target/PvPCore-3.2.0.jar`. The build runs 117 tests, including full-plugin tests on a simulated Paper server (MockBukkit).

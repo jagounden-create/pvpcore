@@ -124,6 +124,10 @@ public final class Rules {
       return material == null ? null : this.rules.get(material);
    }
 
+   public boolean isEmpty() {
+      return this.rules.isEmpty();
+   }
+
    public Collection<Rule> all() {
       return Collections.unmodifiableCollection(this.rules.values());
    }

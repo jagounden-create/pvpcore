@@ -45,6 +45,8 @@ class CommandTest extends PluginTest {
       assertTrue(this.plugin.settings().on(Feature.COMBAT_TAG));
       assertTrue(this.plugin.settings().on(Feature.GHOST_PLAYERS));
       assertTrue(this.plugin.settings().on(Feature.PEARL_ANTI_GLITCH));
+      assertTrue(this.plugin.settings().on(Feature.WIND_STOP));
+      assertTrue(this.plugin.settings().on(Feature.WIND_JUMP));
       assertFalse(this.plugin.settings().on(Feature.NO_SWEEP));
       admin.performCommand("pvpcore preset cart");
       assertTrue(this.plugin.settings().on(Feature.CART_TERRAIN));

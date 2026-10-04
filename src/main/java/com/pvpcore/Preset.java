@@ -49,10 +49,12 @@ public enum Preset {
          settings.set(Feature.SPEAR_CHARGE_CAP, true);
          settings.set(Feature.COMBAT_TAG, true);
          settings.set(Feature.INSTANT_RESPAWN, true);
+         settings.set(Feature.WIND_STOP, true);
+         settings.set(Feature.WIND_JUMP, true);
       },
       "Mace and spear free-for-all: capped",
-      "one-shots, combat tag, instant respawn",
-      "and every ghost and pearl fix on."
+      "one-shots, wind charge tech, combat",
+      "tag, instant respawn, every fix on."
    ),
    CART(
       "Cart", Material.TNT_MINECART,

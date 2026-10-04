@@ -120,7 +120,7 @@ public final class KnockbackModule extends Module {
 
    private boolean nearGround(Player victim) {
       Location feet = victim.getLocation();
-      double ground = groundDistance(feet);
+      double ground = groundDistance(feet, GROUND_REACH);
       if (ground <= GROUND_REACH) {
          return true;
       }
@@ -153,7 +153,8 @@ public final class KnockbackModule extends Module {
       return false;
    }
 
-   private static double groundDistance(Location feet) {
+   /** Distance from the feet down to the ground, checked under the middle and the four corners. */
+   private static double groundDistance(Location feet, double enough) {
       World world = feet.getWorld();
       if (world == null) {
          return Double.POSITIVE_INFINITY;
@@ -166,6 +167,9 @@ public final class KnockbackModule extends Module {
          RayTraceResult hit = world.rayTraceBlocks(start, DOWN, 3.05, FluidCollisionMode.NEVER, true);
          if (hit != null) {
             best = Math.min(best, start.getY() - hit.getHitPosition().getY() - 0.05);
+            if (best <= enough) {
+               break; // close enough to count as on the ground; the other corners can't change that
+            }
          }
       }
 

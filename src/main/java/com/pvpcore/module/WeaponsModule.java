@@ -194,11 +194,9 @@ public final class WeaponsModule extends Module {
    @EventHandler
    public void onQuit(PlayerQuitEvent event) {
       UUID id = event.getPlayer().getUniqueId();
-      // The cooldown survives a relog while it runs; spent ones are dropped.
-      Integer ready = this.lungeReady.get(id);
-      if (ready != null && ready <= Bukkit.getCurrentTick()) {
-         this.lungeReady.remove(id);
-      }
+      // A cooldown survives a relog while it runs; spent ones (anyone's) are dropped.
+      int now = Bukkit.getCurrentTick();
+      this.lungeReady.values().removeIf(ready -> ready <= now);
 
       this.suppressed.remove(id);
       this.lastNotice.remove(id);

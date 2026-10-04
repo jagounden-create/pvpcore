@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,8 +35,9 @@ public final class Settings {
    private boolean writable;
    private boolean saveQueued;
    private String loadError;
-   private final Map<Feature, Boolean> enabled = new EnumMap<>(Feature.class);
-   private final Map<Feature, Double> values = new EnumMap<>(Feature.class);
+   /** By {@link Feature#ordinal()}: read by every event handler, so plain arrays rather than maps. */
+   private final boolean[] enabled = new boolean[Feature.values().length];
+   private final double[] values = new double[Feature.values().length];
    private final Map<String, String> messages = new HashMap<>();
    private List<String> crystalWorlds = List.of();
    private List<String> blockedCommands = List.of();
@@ -78,6 +78,10 @@ public final class Settings {
    Settings(PvPCore plugin) {
       this.plugin = plugin;
       this.file = new File(plugin.getDataFolder(), "config.yml");
+      for (Feature feature : Feature.values()) {
+         this.enabled[feature.ordinal()] = feature.fallback();
+         this.values[feature.ordinal()] = feature.value() == null ? 0.0 : feature.value().fallback();
+      }
    }
 
    /** @return true when config.yml was read, false when it has an error and the previous settings were kept */
@@ -158,7 +162,7 @@ public final class Settings {
       YamlConfiguration config = this.config;
 
       for (Feature feature : Feature.values()) {
-         this.enabled.put(feature, config.getBoolean(feature.path(), feature.fallback()));
+         this.enabled[feature.ordinal()] = config.getBoolean(feature.path(), feature.fallback());
          Feature.Value value = feature.value();
          if (value != null) {
             double raw = config.getDouble(value.path(), value.fallback());
@@ -167,7 +171,7 @@ public final class Settings {
                this.plugin.getLogger().warning(value.path() + " is " + raw + ", outside " + value.min() + " to " + value.max() + " - using " + clamped + ".");
             }
 
-            this.values.put(feature, clamped);
+            this.values[feature.ordinal()] = clamped;
          }
       }
 
@@ -306,12 +310,12 @@ public final class Settings {
    // ------------------------------------------------------------------ switches
 
    public boolean on(Feature feature) {
-      return this.enabled.getOrDefault(feature, feature.fallback());
+      return this.enabled[feature.ordinal()];
    }
 
    public double value(Feature feature) {
       Feature.Value value = feature.value();
-      return value == null ? 0.0 : this.values.getOrDefault(feature, value.fallback());
+      return value == null ? 0.0 : this.values[feature.ordinal()];
    }
 
    public int ticks(Feature feature) {
@@ -319,7 +323,7 @@ public final class Settings {
    }
 
    public void set(Feature feature, boolean on) {
-      this.enabled.put(feature, on);
+      this.enabled[feature.ordinal()] = on;
       this.config.set(feature.path(), on);
       this.requestSave();
    }
@@ -331,7 +335,7 @@ public final class Settings {
       }
 
       double clamped = value.clamp(amount);
-      this.values.put(feature, clamped);
+      this.values[feature.ordinal()] = clamped;
       this.config.set(value.path(), value.unit().whole() ? (Object)(int)clamped : (Object)clamped);
       this.requestSave();
       return clamped;
@@ -339,11 +343,11 @@ public final class Settings {
 
    public void resetAll() {
       for (Feature feature : Feature.values()) {
-         this.enabled.put(feature, feature.fallback());
+         this.enabled[feature.ordinal()] = feature.fallback();
          this.config.set(feature.path(), feature.fallback());
          Feature.Value value = feature.value();
          if (value != null) {
-            this.values.put(feature, value.fallback());
+            this.values[feature.ordinal()] = value.fallback();
             this.config.set(value.path(), value.unit().whole() ? (Object)(int)value.fallback() : (Object)value.fallback());
          }
       }

@@ -9,6 +9,7 @@ import com.pvpcore.util.Hits;
 import com.pvpcore.util.Text;
 import com.destroystokyo.paper.event.player.PlayerLaunchProjectileEvent;
 import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -58,6 +59,13 @@ public final class MaceModule extends Module {
    private final Map<UUID, Integer> smashReady = new ConcurrentHashMap<>();
    private final Set<UUID> glided = ConcurrentHashMap.newKeySet();
    private final Map<UUID, Integer> windStopReady = new ConcurrentHashMap<>();
+   /**
+    * Each player's latest movement, {dx, dy, dz, tick}, from their own movement packets. The server's velocity for a
+    * player is not how they are really moving (their game moves them), so wind charge stops go by this instead.
+    */
+   private final Map<UUID, double[]> moves = new HashMap<>();
+   /** A movement older than this many ticks says nothing about how the player is moving now. */
+   static final int MOVE_FRESH_TICKS = 3;
    private final Enchantment density = density();
 
    public MaceModule(PvPCore plugin) {
@@ -81,6 +89,10 @@ public final class MaceModule extends Module {
 
       if (!this.on(Feature.NO_ELYTRA_SMASH)) {
          this.glided.clear();
+      }
+
+      if (!this.on(Feature.WIND_STOP)) {
+         this.moves.clear();
       }
    }
 
@@ -244,7 +256,7 @@ public final class MaceModule extends Module {
       Settings.Tuning tuning = this.settings().tuning();
       float pitch = player.getLocation().getPitch();
       int now = Bukkit.getCurrentTick();
-      Vector velocity = player.getVelocity();
+      Vector velocity = this.movement(player, now);
       if (this.on(Feature.WIND_STOP) && canStop(velocity.getY(), pitch, ((LivingEntity)player).isOnGround(), tuning)) {
          Integer ready = this.windStopReady.get(player.getUniqueId());
          if (ready == null || now >= ready) {
@@ -273,6 +285,12 @@ public final class MaceModule extends Module {
             charge.explode();
          }
       }
+   }
+
+   /** How the player is moving, per tick, by their latest movement packets; still when there is no recent one. */
+   private Vector movement(Player player, int now) {
+      double[] move = this.moves.get(player.getUniqueId());
+      return move == null || now - (int)move[3] > MOVE_FRESH_TICKS ? new Vector() : new Vector(move[0], move[1], move[2]);
    }
 
    /** Falling fast enough, looking far enough down, and not standing on anything. */
@@ -347,6 +365,22 @@ public final class MaceModule extends Module {
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onMove(PlayerMoveEvent event) {
+      if (this.on(Feature.WIND_STOP)) {
+         Location from = event.getFrom();
+         Location to = event.getTo();
+         double dx = to.getX() - from.getX();
+         double dy = to.getY() - from.getY();
+         double dz = to.getZ() - from.getZ();
+         // Turning the head only says nothing about movement; keep the last real one.
+         if (dx != 0.0 || dy != 0.0 || dz != 0.0) {
+            double[] move = this.moves.computeIfAbsent(event.getPlayer().getUniqueId(), ignored -> new double[4]);
+            move[0] = dx;
+            move[1] = dy;
+            move[2] = dz;
+            move[3] = Bukkit.getCurrentTick();
+         }
+      }
+
       if (!this.glided.isEmpty()) {
          Player player = event.getPlayer();
          // Landed: the next fall is a clean one.
@@ -366,6 +400,7 @@ public final class MaceModule extends Module {
       this.forget(event.getPlayer().getUniqueId());
       this.smashReady.remove(event.getPlayer().getUniqueId());
       this.windStopReady.remove(event.getPlayer().getUniqueId());
+      this.moves.remove(event.getPlayer().getUniqueId());
    }
 
    private void forget(UUID id) {

@@ -52,6 +52,7 @@ public class PvPCore extends JavaPlugin {
 
    @Override
    public void onEnable() {
+      Integrations.forget();
       this.settings = new Settings(this);
       this.settings.load();
       this.rules = new Rules(this);
@@ -169,6 +170,7 @@ public class PvPCore extends JavaPlugin {
    }
 
    public void applyAll() {
+      Integrations.forget();
       for (Module module : this.modules) {
          try {
             module.apply();
@@ -282,7 +284,9 @@ public class PvPCore extends JavaPlugin {
       }
 
       if (Integrations.attributeSwapPlugin()) {
-         this.getLogger().info("PaperAttributeSwapFix found - it owns attribute swapping.");
+         this.getLogger().info("PaperAttributeSwapFix found - it owns attribute swapping. PvPCore can do this itself; that plugin can be removed.");
+      } else if (this.combat != null && this.combat.emulatingSwaps()) {
+         this.getLogger().info("Attribute swapping is done by PvPCore (this server has no Paper switch for it).");
       }
 
       if (!this.particlesAvailable()) {

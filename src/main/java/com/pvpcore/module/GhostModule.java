@@ -79,7 +79,8 @@ public final class GhostModule extends Module {
    private Resync resync;
    private BukkitTask ticker;
    private int nextScan;
-   private double trackingRange = 48.0;
+   /** Player tracking range per world name, from spigot.yml: a world's own setting, else the default. */
+   private final Map<String, Double> trackingRanges = new HashMap<>();
    private boolean trackerBroken;
 
    public GhostModule(PvPCore plugin) {
@@ -92,12 +93,12 @@ public final class GhostModule extends Module {
       if (this.resync == null) {
          this.plugin.getLogger().info("Ghost fixes: this server's internals are not the expected ones, so golden hearts are fixed by re-showing the player.");
       }
-      this.trackingRange = playerTrackingRange();
       this.ticker = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tick, 1L, 1L);
    }
 
    @Override
    public void apply() {
+      this.trackingRanges.clear();
       if (!this.on(Feature.GHOST_SHIELDS)) {
          this.shieldStates.clear();
          this.shieldDue.clear();
@@ -302,8 +303,12 @@ public final class GhostModule extends Module {
    }
 
    private boolean inRange(Player viewer, Location target) {
-      double range = expectedRange(this.settings().tuning().ghostRange(), this.trackingRange, viewDistance(viewer));
+      double range = expectedRange(this.settings().tuning().ghostRange(), this.trackingRange(viewer.getWorld()), viewDistance(viewer));
       return viewer.getLocation().distanceSquared(target) <= range * range;
+   }
+
+   private double trackingRange(World world) {
+      return this.trackingRanges.computeIfAbsent(world.getName(), GhostModule::playerTrackingRange);
    }
 
    /** How far apart two players can be and still certainly be sent to each other. */
@@ -330,9 +335,12 @@ public final class GhostModule extends Module {
       return client > 0 ? Math.min(server, client) : server;
    }
 
-   static double playerTrackingRange() {
+   /** How far players are sent to each other in this world, by spigot.yml. */
+   static double playerTrackingRange(String world) {
       try {
-         return Bukkit.spigot().getSpigotConfig().getDouble("world-settings.default.entity-tracking-range.players", 48.0);
+         org.bukkit.configuration.file.YamlConfiguration spigot = Bukkit.spigot().getSpigotConfig();
+         double fallback = spigot.getDouble("world-settings.default.entity-tracking-range.players", 48.0);
+         return spigot.getDouble("world-settings." + world + ".entity-tracking-range.players", fallback);
       } catch (RuntimeException | LinkageError e) {
          return 48.0;
       }
@@ -364,21 +372,54 @@ public final class GhostModule extends Module {
 
    private void scan() {
       Set<Long> found = new HashSet<>();
+      double configured = this.settings().tuning().ghostRange();
       for (World world : Bukkit.getWorlds()) {
          List<Player> players = world.getPlayers();
-         if (players.size() < 2) {
+         int count = players.size();
+         if (count < 2) {
             continue;
          }
 
-         for (Player target : players) {
-            if (target.isDead() || target.getGameMode() == GameMode.SPECTATOR || npc(target)) {
+         // Everything per player is read once, not once per pair.
+         double[] x = new double[count];
+         double[] y = new double[count];
+         double[] z = new double[count];
+         double[] reach = new double[count];
+         boolean[] views = new boolean[count];
+         boolean[] seen = new boolean[count];
+         for (int i = 0; i < count; i++) {
+            Player player = players.get(i);
+            Location at = player.getLocation();
+            x[i] = at.getX();
+            y[i] = at.getY();
+            z[i] = at.getZ();
+            double range = expectedRange(configured, this.trackingRange(world), viewDistance(player));
+            reach[i] = range * range;
+            views[i] = !player.isDead() && !npc(player);
+            seen[i] = views[i] && player.getGameMode() != GameMode.SPECTATOR;
+         }
+
+         for (int t = 0; t < count; t++) {
+            if (!seen[t]) {
                continue;
             }
 
+            Player target = players.get(t);
             Set<Player> tracked = null;
-            Location at = target.getLocation();
-            for (Player viewer : players) {
-               if (viewer == target || viewer.isDead() || npc(viewer) || !this.inRange(viewer, at) || !viewer.canSee(target)) {
+            for (int v = 0; v < count; v++) {
+               if (v == t || !views[v]) {
+                  continue;
+               }
+
+               double dx = x[v] - x[t];
+               double dy = y[v] - y[t];
+               double dz = z[v] - z[t];
+               if (dx * dx + dy * dy + dz * dz > reach[v]) {
+                  continue;
+               }
+
+               Player viewer = players.get(v);
+               if (!viewer.canSee(target)) {
                   continue;
                }
 

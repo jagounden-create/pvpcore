@@ -43,7 +43,6 @@ import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
@@ -52,9 +51,11 @@ import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Enforces rules.yml: damage nerfs and caps, cooldowns, disabled items and block limits.
@@ -71,6 +72,9 @@ public final class RulesModule extends Module {
    private final Map<UUID, Map<Material, ArrayDeque<BlockKey>>> placed = new HashMap<>();
    private final Map<ChunkKey, CachedCount> chunkCounts = new HashMap<>();
    private final Map<UUID, Long> lastNotice = new HashMap<>();
+   /** Every five minutes: forget spent cooldowns, and block lists of players who left with nothing still standing. */
+   static final long SWEEP_TICKS = 6000L;
+   private BukkitTask sweep;
 
    public RulesModule(PvPCore plugin) {
       super(plugin);
@@ -82,13 +86,66 @@ public final class RulesModule extends Module {
    }
 
    @Override
+   public void start() {
+      this.sweep = Bukkit.getScheduler().runTaskTimer(this.plugin, this::sweep, SWEEP_TICKS, SWEEP_TICKS);
+   }
+
+   @Override
    public void apply() {
       this.chunkCounts.clear();
    }
 
    @Override
    public void stop() {
+      if (this.sweep != null) {
+         this.sweep.cancel();
+      }
+
       this.chunkCounts.clear();
+   }
+
+   /** Item rules are switched on and there is at least one rule: otherwise every handler can stop straight away. */
+   private boolean active() {
+      return this.on(Feature.ITEM_RULES) && !this.rules().isEmpty();
+   }
+
+   private void sweep() {
+      int now = Bukkit.getCurrentTick();
+      Iterator<Map<Material, Integer>> own = this.cooldowns.values().iterator();
+      while (own.hasNext()) {
+         Map<Material, Integer> ends = own.next();
+         ends.values().removeIf(end -> end <= now);
+         if (ends.isEmpty()) {
+            own.remove();
+         }
+      }
+
+      Iterator<Map.Entry<UUID, Map<Material, ArrayDeque<BlockKey>>>> players = this.placed.entrySet().iterator();
+      while (players.hasNext()) {
+         Map.Entry<UUID, Map<Material, ArrayDeque<BlockKey>>> entry = players.next();
+         if (Bukkit.getPlayer(entry.getKey()) != null) {
+            continue;
+         }
+
+         entry.getValue().entrySet().removeIf(blocks -> standing(blocks.getValue(), blocks.getKey()) == 0);
+         if (entry.getValue().isEmpty()) {
+            players.remove();
+         }
+      }
+   }
+
+   @EventHandler
+   public void onQuit(PlayerQuitEvent event) {
+      UUID id = event.getPlayer().getUniqueId();
+      this.lastNotice.remove(id);
+      Map<Material, Integer> own = this.cooldowns.get(id);
+      if (own != null) {
+         int now = Bukkit.getCurrentTick();
+         own.values().removeIf(end -> end <= now);
+         if (own.isEmpty()) {
+            this.cooldowns.remove(id);
+         }
+      }
    }
 
    Rule rule(Material material, World world) {
@@ -232,6 +289,10 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onThrown(PlayerLaunchProjectileEvent event) {
+      if (!this.active()) {
+         return;
+      }
+
       Material material = event.getItemStack().getType();
       this.tagSource(event.getProjectile(), material.name());
       this.used(event.getPlayer(), material);
@@ -247,7 +308,7 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
    public void onShoot(EntityShootBowEvent event) {
-      if (!(event.getEntity() instanceof Player player) || exempt(player) || event.getBow() == null) {
+      if (!(event.getEntity() instanceof Player player) || event.getBow() == null || !this.active() || exempt(player)) {
          return;
       }
 
@@ -268,7 +329,7 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onShot(EntityShootBowEvent event) {
-      if (event.getBow() == null) {
+      if (event.getBow() == null || !this.active()) {
          return;
       }
 
@@ -339,9 +400,9 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
    public void onTotem(EntityResurrectEvent event) {
-      if (event.getEntity() instanceof Player player && !exempt(player)) {
+      if (event.getEntity() instanceof Player player) {
          Rule rule = this.rule(Material.TOTEM_OF_UNDYING, player.getWorld());
-         if (rule != null && this.blocked(player, Material.TOTEM_OF_UNDYING, rule)) {
+         if (rule != null && !exempt(player) && this.blocked(player, Material.TOTEM_OF_UNDYING, rule)) {
             event.setCancelled(true);
          }
       }
@@ -379,20 +440,20 @@ public final class RulesModule extends Module {
    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
    public void onPlaceEntity(EntityPlaceEvent event) {
       Player player = event.getPlayer();
-      if (player == null || exempt(player)) {
+      if (player == null || !this.active()) {
          return;
       }
 
       Material material = handItem(player, event);
       Rule rule = this.rule(material, player.getWorld());
-      if (rule != null && this.blocked(player, material, rule)) {
+      if (rule != null && !exempt(player) && this.blocked(player, material, rule)) {
          event.setCancelled(true);
       }
    }
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onPlacedEntity(EntityPlaceEvent event) {
-      if (event.getPlayer() != null) {
+      if (event.getPlayer() != null && this.active()) {
          this.used(event.getPlayer(), handItem(event.getPlayer(), event));
       }
    }
@@ -411,27 +472,23 @@ public final class RulesModule extends Module {
    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
    public void onPlace(BlockPlaceEvent event) {
       Player player = event.getPlayer();
-      if (exempt(player)) {
-         return;
-      }
-
       Material item = event.getItemInHand().getType();
       Rule rule = this.rule(item, player.getWorld());
-      if (rule != null && this.blocked(player, item, rule)) {
+      if (rule != null && !exempt(player) && this.blocked(player, item, rule)) {
          event.setCancelled(true);
       }
    }
 
    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
    public void onPlaceLimit(BlockPlaceEvent event) {
-      Player player = event.getPlayer();
-      if (exempt(player)) {
+      if (!this.active()) {
          return;
       }
 
+      Player player = event.getPlayer();
       Block block = event.getBlockPlaced();
       Rule rule = this.limitRule(event.getItemInHand().getType(), block.getType(), block.getWorld());
-      if (rule == null) {
+      if (rule == null || exempt(player)) {
          return;
       }
 
@@ -450,6 +507,10 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onPlaced(BlockPlaceEvent event) {
+      if (!this.active()) {
+         return;
+      }
+
       Player player = event.getPlayer();
       Block block = event.getBlockPlaced();
       this.used(player, event.getItemInHand().getType());
@@ -501,10 +562,11 @@ public final class RulesModule extends Module {
    int alive(Player player, Material type) {
       Map<Material, ArrayDeque<BlockKey>> own = this.placed.get(player.getUniqueId());
       ArrayDeque<BlockKey> blocks = own == null ? null : own.get(type);
-      if (blocks == null) {
-         return 0;
-      }
+      return blocks == null ? 0 : standing(blocks, type);
+   }
 
+   /** Drops the blocks that are gone (in loaded chunks; unloaded ones still count) and returns how many are left. */
+   static int standing(ArrayDeque<BlockKey> blocks, Material type) {
       Iterator<BlockKey> iterator = blocks.iterator();
       while (iterator.hasNext()) {
          BlockKey key = iterator.next();
@@ -584,7 +646,7 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
    public void onDamage(EntityDamageByEntityEvent event) {
-      if (!(event.getEntity() instanceof LivingEntity victim) || !this.on(Feature.ITEM_RULES)) {
+      if (!(event.getEntity() instanceof LivingEntity victim) || !this.active()) {
          return;
       }
 
@@ -593,17 +655,25 @@ public final class RulesModule extends Module {
       }
 
       Source source = this.source(event);
-      if (source.materials().isEmpty() || source.player() != null && exempt(source.player())) {
+      if (source.materials().isEmpty()) {
          return;
       }
 
       World world = victim.getWorld();
       double multiplier = 1.0;
       double cap = Double.POSITIVE_INFINITY;
+      boolean checked = false;
       for (Material material : source.materials()) {
          Rule rule = this.rule(material, world);
          if (rule == null) {
             continue;
+         }
+
+         if (!checked) {
+            checked = true;
+            if (source.player() != null && exempt(source.player())) {
+               return;
+            }
          }
 
          if (source.melee() && source.player() != null) {
@@ -627,7 +697,7 @@ public final class RulesModule extends Module {
    /** A weapon's cooldown starts with its main hit on a player (or any mob, with affect-mobs). */
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onDamaged(EntityDamageByEntityEvent event) {
-      if (!(event.getEntity() instanceof LivingEntity victim) || !(victim instanceof Player) && !this.rules().affectMobs()) {
+      if (!this.active() || !(event.getEntity() instanceof LivingEntity victim) || !(victim instanceof Player) && !this.rules().affectMobs()) {
          return;
       }
 
@@ -641,7 +711,7 @@ public final class RulesModule extends Module {
 
    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
    public void onBlockDamage(EntityDamageByBlockEvent event) {
-      if (!(event.getEntity() instanceof LivingEntity victim) || !this.on(Feature.ITEM_RULES)) {
+      if (!(event.getEntity() instanceof LivingEntity victim) || !this.active()) {
          return;
       }
 
