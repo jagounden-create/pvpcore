@@ -4,14 +4,21 @@ import com.pvpcore.Compat;
 import com.pvpcore.Feature;
 import com.pvpcore.Module;
 import com.pvpcore.PvPCore;
+import com.pvpcore.Settings;
+import com.pvpcore.util.Hits;
 import com.pvpcore.util.Text;
+import com.destroystokyo.paper.event.player.PlayerLaunchProjectileEvent;
 import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
+import org.bukkit.FluidCollisionMode;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -28,9 +35,17 @@ import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.util.RayTraceResult;
+import org.bukkit.util.Vector;
 
 /**
- * Mace balance and fairness. Damage changes only apply to hits on players, so mob farms and bosses stay vanilla.
+ * Mace balance and fairness, and wind charge tech. Damage changes only apply to hits on players, so mob farms and
+ * bosses stay vanilla.
+ * <p>
+ * Wind charge stop: using a wind charge while falling and looking down stops the fall in mid-air instead of throwing
+ * it. Instant wind jump: a wind charge thrown down at the ground just below bursts there at once, so the jump doesn't
+ * wait for the charge to fly down and back over the network - it feels the same at any ping.
  */
 public final class MaceModule extends Module {
    /** Vanilla's smash threshold: a mace hit smashes after falling more than this. */
@@ -42,6 +57,7 @@ public final class MaceModule extends Module {
    private final Map<UUID, Attempt> attempts = new ConcurrentHashMap<>();
    private final Map<UUID, Integer> smashReady = new ConcurrentHashMap<>();
    private final Set<UUID> glided = ConcurrentHashMap.newKeySet();
+   private final Map<UUID, Integer> windStopReady = new ConcurrentHashMap<>();
    private final Enchantment density = density();
 
    public MaceModule(PvPCore plugin) {
@@ -128,7 +144,8 @@ public final class MaceModule extends Module {
 
    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
    public void onMaceHit(EntityDamageByEntityEvent event) {
-      if (event.getCause() != DamageCause.ENTITY_ATTACK || !(event.getDamager() instanceof Player attacker)) {
+      // Smashes have their own damage type; servers don't all report it as a plain attack.
+      if (!(event.getDamager() instanceof Player attacker) || !Hits.primary(event)) {
          return;
       }
 
@@ -211,6 +228,116 @@ public final class MaceModule extends Module {
       }
    }
 
+   // ------------------------------------------------------------------ wind charge tech
+
+   @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+   public void onWindTech(PlayerLaunchProjectileEvent event) {
+      if (!Compat.WIND_CHARGE || !(event.getProjectile() instanceof WindCharge) || !this.on(Feature.WIND_STOP) && !this.on(Feature.WIND_JUMP)) {
+         return;
+      }
+
+      Player player = event.getPlayer();
+      if (player.isGliding() || player.isFlying() || player.isInsideVehicle() || player.isRiptiding()) {
+         return;
+      }
+
+      Settings.Tuning tuning = this.settings().tuning();
+      float pitch = player.getLocation().getPitch();
+      int now = Bukkit.getCurrentTick();
+      Vector velocity = player.getVelocity();
+      if (this.on(Feature.WIND_STOP) && canStop(velocity.getY(), pitch, ((LivingEntity)player).isOnGround(), tuning)) {
+         Integer ready = this.windStopReady.get(player.getUniqueId());
+         if (ready == null || now >= ready) {
+            event.setCancelled(true);
+            this.useWindCharge(player, tuning.windStopConsume());
+            player.setVelocity(stopVelocity(velocity, this.settings().value(Feature.WIND_STOP), tuning.windStopHorizontal()));
+            player.setFallDistance(0.0F);
+            // The player keeps falling until the new speed reaches them, one ping later; that bit isn't a fall either.
+            Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+               if (player.isOnline() && !((LivingEntity)player).isOnGround()) {
+                  player.setFallDistance(0.0F);
+               }
+            }, pingTicks(player));
+            this.windStopReady.put(player.getUniqueId(), now + tuning.windStopCooldown());
+            return;
+         }
+      }
+
+      if (this.on(Feature.WIND_JUMP) && pitch >= tuning.windJumpMinPitch()) {
+         Location ground = groundBelow(player, tuning.windJumpMaxHeight());
+         if (ground != null) {
+            event.setCancelled(true);
+            this.useWindCharge(player, true);
+            // Where a thrown charge would have burst: a quarter block off the ground, like vanilla.
+            WindCharge charge = player.getWorld().spawn(ground.add(0.0, 0.25, 0.0), WindCharge.class, spawned -> spawned.setShooter(player));
+            charge.explode();
+         }
+      }
+   }
+
+   /** Falling fast enough, looking far enough down, and not standing on anything. */
+   static boolean canStop(double velocityY, float pitch, boolean onGround, Settings.Tuning tuning) {
+      return !onGround && velocityY <= -tuning.windStopMinFall() && pitch >= tuning.windStopMinPitch();
+   }
+
+   /** What a stop leaves: the chosen upward speed, and a share of the sideways speed. */
+   static Vector stopVelocity(Vector velocity, double lift, double keepHorizontal) {
+      return new Vector(velocity.getX() * keepHorizontal, lift, velocity.getZ() * keepHorizontal);
+   }
+
+   /** The point on the ground straight below the player's feet, if it is within {@code maxHeight} blocks. */
+   private static Location groundBelow(Player player, double maxHeight) {
+      Location feet = player.getLocation();
+      World world = feet.getWorld();
+      if (world == null) {
+         return null;
+      }
+
+      if (((LivingEntity)player).isOnGround()) {
+         return feet;
+      }
+
+      RayTraceResult hit = world.rayTraceBlocks(feet, new Vector(0, -1, 0), maxHeight, FluidCollisionMode.NEVER, true);
+      return hit == null ? null : hit.getHitPosition().toLocation(world);
+   }
+
+   /** About one round trip to the player, in ticks: 1 to 10. */
+   static long pingTicks(Player player) {
+      int ping;
+      try {
+         ping = player.getPing();
+      } catch (RuntimeException | LinkageError e) {
+         ping = 100;
+      }
+
+      return Math.max(1L, Math.min(10L, ping / 50L + 1L));
+   }
+
+   /** What vanilla does when a wind charge is thrown: one used up (outside creative) and the item cooldown. */
+   private void useWindCharge(Player player, boolean consume) {
+      if (consume && player.getGameMode() != GameMode.CREATIVE) {
+         PlayerInventory inventory = player.getInventory();
+         ItemStack main = inventory.getItemInMainHand();
+         boolean inMain = main.getType() == Material.WIND_CHARGE;
+         ItemStack held = inMain ? main : inventory.getItemInOffHand();
+         if (held.getType() == Material.WIND_CHARGE) {
+            held.setAmount(held.getAmount() - 1);
+            if (inMain) {
+               inventory.setItemInMainHand(held.getAmount() > 0 ? held : null);
+            } else {
+               inventory.setItemInOffHand(held.getAmount() > 0 ? held : null);
+            }
+         }
+      }
+
+      int cooldown = this.on(Feature.WIND_CHARGE_COOLDOWN) ? this.settings().ticks(Feature.WIND_CHARGE_COOLDOWN) : VANILLA_WIND_COOLDOWN;
+      player.setCooldown(Material.WIND_CHARGE, cooldown);
+      player.updateInventory();
+      this.plugin.itemUsed(player, Material.WIND_CHARGE);
+   }
+
+   static final int VANILLA_WIND_COOLDOWN = 10;
+
    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
    public void onGlide(EntityToggleGlideEvent event) {
       if (event.isGliding() && event.getEntity() instanceof Player player && this.on(Feature.NO_ELYTRA_SMASH)) {
@@ -238,6 +365,7 @@ public final class MaceModule extends Module {
    public void onQuit(PlayerQuitEvent event) {
       this.forget(event.getPlayer().getUniqueId());
       this.smashReady.remove(event.getPlayer().getUniqueId());
+      this.windStopReady.remove(event.getPlayer().getUniqueId());
    }
 
    private void forget(UUID id) {

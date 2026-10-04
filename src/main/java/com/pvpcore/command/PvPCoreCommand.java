@@ -7,6 +7,7 @@ import com.pvpcore.PvPCore;
 import com.pvpcore.Settings;
 import com.pvpcore.menu.Menus;
 import com.pvpcore.menu.Status;
+import com.pvpcore.module.GhostModule;
 import com.pvpcore.rules.Rule;
 import com.pvpcore.util.Text;
 import java.util.ArrayList;
@@ -22,7 +23,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 public final class PvPCoreCommand implements TabExecutor {
-   private static final List<String> SUBCOMMANDS = List.of("menu", "status", "reload", "toggle", "set", "preset", "rules", "rule", "help");
+   private static final List<String> SUBCOMMANDS = List.of("menu", "status", "reload", "toggle", "set", "preset", "rules", "rule", "fix", "help");
    private static final List<String> RULE_SETTINGS = List.of("damage", "max-damage", "cooldown", "disabled", "chunk-limit", "player-limit", "worlds", "remove");
    private static final String ACCENT = "<#7DD3FC>";
    private static final String SOFT = "<" + Text.SOFT + ">";
@@ -73,6 +74,7 @@ public final class PvPCoreCommand implements TabExecutor {
             }
          }
          case "rule" -> this.rule(sender, label, args);
+         case "fix" -> this.fix(sender, label, args);
          default -> this.usage(sender, label);
       }
 
@@ -189,6 +191,32 @@ public final class PvPCoreCommand implements TabExecutor {
       this.plugin.applyAll();
       this.plugin.getLogger().info(sender.getName() + " applied the " + preset.label() + " preset.");
       say(sender, GOOD + preset.label() + " preset applied. " + SOFT + "Item rules were kept." + this.saveWarning());
+   }
+
+   /** Re-shows a player to everyone near them, and everyone near them to the player. */
+   private void fix(CommandSender sender, String label, String[] args) {
+      GhostModule ghosts = this.plugin.ghosts();
+      Player target;
+      if (args.length >= 2) {
+         target = Bukkit.getPlayerExact(args[1]);
+         if (target == null) {
+            say(sender, BAD + "No player online called '" + Text.escape(args[1]) + "'.");
+            return;
+         }
+      } else if (sender instanceof Player player) {
+         target = player;
+      } else {
+         say(sender, SOFT + "Usage: /" + label + " fix <player>");
+         return;
+      }
+
+      if (ghosts == null) {
+         say(sender, BAD + "Ghost fixes are not running.");
+         return;
+      }
+
+      int fixed = ghosts.fix(target, GhostModule.Reason.COMMAND);
+      say(sender, SOFT + "Re-sent <white>" + Text.escape(target.getName()) + SOFT + " to and from <white>" + fixed + SOFT + (fixed == 1 ? " view." : " views."));
    }
 
    private String saveWarning() {
@@ -339,6 +367,19 @@ public final class PvPCoreCommand implements TabExecutor {
 
       say(sender, MUTED + "Server <white>" + Text.escape(Bukkit.getName() + " " + Compat.serverVersion()) + SOFT + " - shields "
          + (this.plugin.modernShields() ? "data-driven" : "in compatibility mode") + ", particles " + (this.plugin.particlesAvailable() ? "filterable" : "not filterable"));
+      GhostModule ghosts = this.plugin.ghosts();
+      if (ghosts != null) {
+         StringBuilder fixes = new StringBuilder();
+         for (GhostModule.Reason reason : GhostModule.Reason.values()) {
+            long count = ghosts.count(reason);
+            if (count > 0) {
+               fixes.append(fixes.isEmpty() ? "" : ", ").append(reason.name().toLowerCase(Locale.ROOT)).append(' ').append(count);
+            }
+         }
+
+         say(sender, MUTED + "Ghost fixes since start <white>" + (fixes.isEmpty() ? "none" : fixes) + SOFT + " - re-send "
+            + (ghosts.lightResync() ? "light" : "by re-showing") + ", scanner " + (ghosts.scannerAvailable() ? "supported" : "not supported"));
+      }
       if (!settings.writable()) {
          say(sender, WARN + "config.yml has an error and is not being saved: " + Text.escape(String.valueOf(settings.loadError())));
       }
@@ -358,6 +399,7 @@ public final class PvPCoreCommand implements TabExecutor {
       say(sender, SOFT + "/" + label + " preset <" + String.join("|", presetIds()) + ">");
       say(sender, SOFT + "/" + label + " rules <white>- item nerfs, cooldowns and limits");
       say(sender, SOFT + "/" + label + " rule <item> <setting> <value> <white>- e.g. rule ender_pearl cooldown 15");
+      say(sender, SOFT + "/" + label + " fix [player] <white>- re-show a player who went invisible to others");
    }
 
    private void unknown(CommandSender sender, String id) {
@@ -423,6 +465,14 @@ public final class PvPCoreCommand implements TabExecutor {
                yield matching(pages, args[1]);
             }
             case "rule" -> materials(args[1]);
+            case "fix" -> {
+               List<String> names = new ArrayList<>();
+               for (Player player : Bukkit.getOnlinePlayers()) {
+                  names.add(player.getName());
+               }
+
+               yield matchingIgnoringCase(names, args[1]);
+            }
             default -> List.of();
          };
       }
@@ -474,6 +524,18 @@ public final class PvPCoreCommand implements TabExecutor {
                   result.add(name);
                }
             }
+         }
+      }
+
+      return result;
+   }
+
+   private static List<String> matchingIgnoringCase(List<String> options, String typed) {
+      String prefix = typed.toLowerCase(Locale.ROOT);
+      List<String> result = new ArrayList<>();
+      for (String option : options) {
+         if (option.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+            result.add(option);
          }
       }
 

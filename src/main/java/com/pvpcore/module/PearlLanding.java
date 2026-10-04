@@ -89,6 +89,83 @@ public final class PearlLanding {
       }
    }
 
+   /** Offsets tried by {@link #nearestClear}, nearest first: within 0.6 blocks sideways and a block up or down. */
+   static final double[] SIDEWAYS = {0.0, 0.3, -0.3, 0.6, -0.6};
+   static final double[] VERTICAL = {0.0, 0.5, -0.5, 1.0, -1.0};
+   static final double MAX_SIDEWAYS = 0.6 + 1.0E-9;
+   /** The pearl rests on a block's surface, so a line from it may touch that surface right at the pearl. */
+   static final double SURFACE = 0.05;
+   /** Height of the pearl's centre above its position. */
+   static final double PEARL_MIDDLE = 0.125;
+
+   /**
+    * The nearest place to put a player whose landing spot ({@code x, y, z}: feet, where the pearl stopped) is inside a
+    * block, preferring spots on the side they threw from. Only spots the pearl could reach in a straight line without
+    * passing through a block are used, checked both ways, so the far side of a pane, door, bars or wall is never
+    * picked. Null when there is none, and the pearl should not land.
+    */
+   public static double[] nearestClear(double x, double y, double z, double fromX, double fromY, double fromZ, double width, double height,
+                                       Collision world, Passage passage) {
+      if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z) || !(width > 0.0) || !(height > 0.0) || width > 4.0 || height > 8.0) {
+         return null;
+      }
+
+      double half = width / 2.0;
+      List<double[]> candidates = new ArrayList<>();
+      for (double dy : VERTICAL) {
+         for (double dx : SIDEWAYS) {
+            for (double dz : SIDEWAYS) {
+               if (dx * dx + dz * dz <= MAX_SIDEWAYS * MAX_SIDEWAYS) {
+                  candidates.add(new double[]{x + dx, y + dy, z + dz, dx * dx + dy * dy + dz * dz});
+               }
+            }
+         }
+      }
+
+      candidates.sort((a, b) -> {
+         int byShift = Double.compare(a[3], b[3]);
+         if (byShift != 0) {
+            return byShift;
+         }
+
+         return Double.compare(square(a[0] - fromX, a[1] - fromY, a[2] - fromZ), square(b[0] - fromX, b[1] - fromY, b[2] - fromZ));
+      });
+      double pearlY = y + PEARL_MIDDLE;
+      for (double[] c : candidates) {
+         if (world.collides(c[0] - half, c[1], c[2] - half, c[0] + half, c[1] + height, c[2] + half)) {
+            continue;
+         }
+
+         double distance = Math.sqrt(square(x - c[0], y - c[1], z - c[2]));
+         if (distance < 1.0E-6) {
+            return new double[]{c[0], c[1], c[2]};
+         }
+
+         double spotY = c[1] + PEARL_MIDDLE;
+         if (clear(passage.blockedAt(x, pearlY, z, c[0], spotY, c[2]), distance)
+            && clear(passage.blockedAt(c[0], spotY, c[2], x, pearlY, z), distance)) {
+            return new double[]{c[0], c[1], c[2]};
+         }
+      }
+
+      return null;
+   }
+
+   /** Nothing in the way, or only the surface the pearl itself rests on, right at the end of the line. */
+   private static boolean clear(double blockedAt, double distance) {
+      return blockedAt < 0.0 || blockedAt >= distance - SURFACE;
+   }
+
+   private static double square(double dx, double dy, double dz) {
+      return dx * dx + dy * dy + dz * dz;
+   }
+
+   /** How far along the straight line from the first point to the second a block is hit, or -1 when nothing is. */
+   @FunctionalInterface
+   public interface Passage {
+      double blockedAt(double x1, double y1, double z1, double x2, double y2, double z2);
+   }
+
    @FunctionalInterface
    public interface Collision {
       boolean collides(double var1, double var3, double var5, double var7, double var9, double var11);

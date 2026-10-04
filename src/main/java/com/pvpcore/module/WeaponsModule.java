@@ -4,7 +4,9 @@ import com.pvpcore.Compat;
 import com.pvpcore.Feature;
 import com.pvpcore.Module;
 import com.pvpcore.PvPCore;
+import com.pvpcore.util.Attributes;
 import com.pvpcore.util.Bedrock;
+import com.pvpcore.util.Hits;
 import com.pvpcore.util.Text;
 import java.util.Map;
 import java.util.UUID;
@@ -26,11 +28,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 /**
- * Spear Lunge cooldown and the Bedrock damage buff.
+ * Spears (Lunge cooldown, charge damage) and the Bedrock damage buff.
  * <p>
  * Lunge (1.21.11+) is an enchantment effect on the spear's jab: it charges hunger through Paper's exhaustion event
  * (reason ENCHANTMENT_EFFECT) and pushes the player forward. Neither client nor server checks item cooldowns for jabs,
  * so a lunge during the cooldown is undone instead: no hunger is taken and the forward push is cancelled.
+ * <p>
+ * A spear charge is the held attack: the spear is raised and runs into people, dealing damage that grows with speed.
+ * Riding an elytra or a horse into someone makes it enormous, so it can be scaled, capped, or held to a normal hit's
+ * damage while gliding. Hits on players only.
  */
 public final class WeaponsModule extends Module {
    private final Map<UUID, Integer> lungeReady = new ConcurrentHashMap<>();
@@ -66,6 +72,39 @@ public final class WeaponsModule extends Module {
 
    static boolean isSpear(Material material) {
       return material.name().endsWith("_SPEAR");
+   }
+
+   // ------------------------------------------------------------------ spear charges
+
+   @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+   public void onCharge(EntityDamageByEntityEvent event) {
+      if (!Compat.SPEAR || !(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player)) {
+         return;
+      }
+
+      boolean scale = this.on(Feature.SPEAR_CHARGE_DAMAGE);
+      boolean cap = this.on(Feature.SPEAR_CHARGE_CAP);
+      boolean glide = this.on(Feature.NO_GLIDE_CHARGE);
+      if (!scale && !cap && !glide || !Hits.charging(attacker)) {
+         return;
+      }
+
+      double before = event.getDamage();
+      double damage = chargeDamage(
+         before,
+         glide && attacker.isGliding() ? Attributes.value(attacker, Attributes.attackDamage(), before) : Double.POSITIVE_INFINITY,
+         scale ? this.settings().value(Feature.SPEAR_CHARGE_DAMAGE) : 1.0,
+         cap ? this.settings().value(Feature.SPEAR_CHARGE_CAP) * 2.0 : Double.POSITIVE_INFINITY
+      );
+      if (Math.abs(damage - before) > 1.0E-9) {
+         event.setDamage(damage);
+      }
+   }
+
+   /** A charge's damage: held to a normal hit while gliding, then scaled, then capped. */
+   static double chargeDamage(double damage, double glideLimit, double factor, double cap) {
+      double out = Math.min(damage, glideLimit) * factor;
+      return Math.max(0.0, Math.min(out, cap));
    }
 
    static boolean swordOrAxe(Material material) {
@@ -155,6 +194,12 @@ public final class WeaponsModule extends Module {
    @EventHandler
    public void onQuit(PlayerQuitEvent event) {
       UUID id = event.getPlayer().getUniqueId();
+      // The cooldown survives a relog while it runs; spent ones are dropped.
+      Integer ready = this.lungeReady.get(id);
+      if (ready != null && ready <= Bukkit.getCurrentTick()) {
+         this.lungeReady.remove(id);
+      }
+
       this.suppressed.remove(id);
       this.lastNotice.remove(id);
       Bedrock.forget(id);

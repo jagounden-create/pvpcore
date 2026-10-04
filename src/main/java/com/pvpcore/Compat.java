@@ -22,6 +22,8 @@ public final class Compat {
    public static final boolean MACE = Material.matchMaterial("MACE") != null;
    /** 1.21.11+: spears and the Lunge enchantment. */
    public static final boolean SPEAR = Material.matchMaterial("IRON_SPEAR") != null;
+   /** Paper's entity tracker API: which players a player is currently sent to. */
+   public static final boolean TRACKED_BY = hasMethod("org.bukkit.entity.Entity", "getTrackedBy");
 
    private Compat() {
    }
@@ -39,6 +41,15 @@ public final class Compat {
          Class.forName(name, false, Compat.class.getClassLoader());
          return true;
       } catch (ClassNotFoundException | LinkageError e) {
+         return false;
+      }
+   }
+
+   static boolean hasMethod(String className, String method, Class<?>... parameters) {
+      try {
+         Class.forName(className, false, Compat.class.getClassLoader()).getMethod(method, parameters);
+         return true;
+      } catch (ReflectiveOperationException | LinkageError e) {
          return false;
       }
    }

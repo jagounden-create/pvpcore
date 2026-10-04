@@ -140,6 +140,7 @@ class CombatGameplayTest extends PluginTest {
    @Test
    void noPearlDamageOnlyForThePearlLanding() {
       this.set(Feature.NO_PEARL_DAMAGE, true);
+      this.set(Feature.PEARL_ANTI_GLITCH, false); // MockBukkit can't check block shapes
       PlayerMock player = this.server.addPlayer();
       Location from = new Location(this.world, 0, 64, 0);
       Location to = new Location(this.world, 5, 64, 0);

@@ -46,6 +46,34 @@ public final class Settings {
    private String accent = DEFAULT_ACCENT;
    private Material filler = Material.BLACK_STAINED_GLASS_PANE;
    private boolean smallCaps = true;
+   private Tuning tuning = Tuning.DEFAULTS;
+
+   /**
+    * Fine-tuning that has no switch of its own, read from config.yml.
+    *
+    * @param windStopMinFall    how fast (blocks per tick) a player must be falling for a wind charge stop
+    * @param windStopMinPitch   how far down (degrees) they must look
+    * @param windStopCooldown   ticks between stops
+    * @param windStopHorizontal how much sideways speed a stop keeps (0 to 1)
+    * @param windStopConsume    whether a stop uses up the wind charge
+    * @param windJumpMinPitch   how far down a player must look for an instant wind jump
+    * @param windJumpMaxHeight  how high above the ground (blocks) a wind jump still bursts at the feet
+    * @param ghostRange         players this close (blocks) are expected to see each other
+    * @param pearlRefund        whether a pearl stopped by the anti-glitch is given back
+    */
+   public record Tuning(
+      double windStopMinFall,
+      double windStopMinPitch,
+      int windStopCooldown,
+      double windStopHorizontal,
+      boolean windStopConsume,
+      double windJumpMinPitch,
+      double windJumpMaxHeight,
+      double ghostRange,
+      boolean pearlRefund
+   ) {
+      public static final Tuning DEFAULTS = new Tuning(0.2, 60.0, 20, 0.5, true, 75.0, 2.0, 32.0, true);
+   }
 
    Settings(PvPCore plugin) {
       this.plugin = plugin;
@@ -165,6 +193,18 @@ public final class Settings {
       Material filler = fillerName == null ? null : Material.matchMaterial(fillerName);
       this.filler = filler != null && (filler.isAir() || filler.isItem()) ? filler : Material.BLACK_STAINED_GLASS_PANE;
       this.smallCaps = config.getBoolean("menu.small-caps", true);
+      Tuning d = Tuning.DEFAULTS;
+      this.tuning = new Tuning(
+         range(config.getDouble("mace.wind-stop.min-fall-speed", d.windStopMinFall()), 0.0, 4.0),
+         range(config.getDouble("mace.wind-stop.min-pitch", d.windStopMinPitch()), -90.0, 90.0),
+         (int)Math.round(range(config.getDouble("mace.wind-stop.cooldown-seconds", d.windStopCooldown() / 20.0), 0.0, 60.0) * 20.0),
+         range(config.getDouble("mace.wind-stop.keep-horizontal", d.windStopHorizontal()), 0.0, 1.0),
+         config.getBoolean("mace.wind-stop.consume", d.windStopConsume()),
+         range(config.getDouble("mace.wind-jump.min-pitch", d.windJumpMinPitch()), -90.0, 90.0),
+         range(config.getDouble("mace.wind-jump.max-height", d.windJumpMaxHeight()), 0.0, 6.0),
+         range(config.getDouble("ghost-fixes.scanner.range", d.ghostRange()), 8.0, 128.0),
+         config.getBoolean("pearls.anti-glitch.refund", d.pearlRefund())
+      );
       this.messages.clear();
       ConfigurationSection section = config.getConfigurationSection("messages");
       if (section != null) {
@@ -172,6 +212,10 @@ public final class Settings {
             this.messages.put(key, section.getString(key, ""));
          }
       }
+   }
+
+   private static double range(double value, double min, double max) {
+      return Double.isNaN(value) ? min : Math.max(min, Math.min(max, value));
    }
 
    private YamlConfiguration readDefaults() {
@@ -381,6 +425,10 @@ public final class Settings {
 
    public boolean smallCaps() {
       return this.smallCaps;
+   }
+
+   public Tuning tuning() {
+      return this.tuning;
    }
 
    /** A message from config.yml, falling back to the built-in one. Empty means "send nothing". */

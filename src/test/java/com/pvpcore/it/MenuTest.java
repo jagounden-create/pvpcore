@@ -33,10 +33,10 @@ class MenuTest extends PluginTest {
       PlayerMock admin = this.openHub();
       Inventory hub = admin.getOpenInventory().getTopInventory();
       assertEquals(27, hub.getSize());
-      int[] categorySlots = {11, 12, 13, 14, 15};
       Feature.Category[] categories = Feature.Category.values();
+      assertEquals(7, categories.length);
       for (int i = 0; i < categories.length; i++) {
-         assertEquals(categories[i].icon(), hub.getItem(categorySlots[i]).getType(), categories[i].label());
+         assertEquals(categories[i].icon(), hub.getItem(10 + i).getType(), categories[i].label());
       }
 
       assertEquals(Material.SMITHING_TABLE, hub.getItem(20).getType());
@@ -50,7 +50,7 @@ class MenuTest extends PluginTest {
    void everyCategoryPageRendersEverySwitchWithAStatusPane() {
       for (Feature.Category category : Feature.Category.values()) {
          PlayerMock admin = this.openHub();
-         this.click(admin, 11 + category.ordinal(), ClickType.LEFT);
+         this.click(admin, 10 + category.ordinal(), ClickType.LEFT);
          Inventory page = admin.getOpenInventory().getTopInventory();
          assertEquals((2 + 2 * category.sections().size()) * 9, page.getSize(), category.label());
          int icons = 0;
@@ -80,7 +80,7 @@ class MenuTest extends PluginTest {
    @Test
    void clickingTogglesAndRightClickingStepsTheValue() throws IOException {
       PlayerMock admin = this.openHub();
-      this.click(admin, 11, ClickType.LEFT); // Sword
+      this.click(admin, 10, ClickType.LEFT); // Sword
       Inventory page = admin.getOpenInventory().getTopInventory();
       int slot = slotOf(page, Feature.KNOCKBACK_DISTANCE.icon());
       assertTrue(this.plugin.settings().on(Feature.KNOCKBACK_DISTANCE));
@@ -105,7 +105,7 @@ class MenuTest extends PluginTest {
    @Test
    void backReturnsToTheHub() {
       PlayerMock admin = this.openHub();
-      this.click(admin, 12, ClickType.LEFT); // Mace: 1 section -> 4 rows, back at 31
+      this.click(admin, 12, ClickType.LEFT); // Spear: 1 section -> 4 rows, back at 31
       assertEquals(36, admin.getOpenInventory().getTopInventory().getSize());
       this.click(admin, 31, ClickType.LEFT);
       assertEquals(27, admin.getOpenInventory().getTopInventory().getSize());

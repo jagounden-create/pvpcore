@@ -40,7 +40,12 @@ public final class Status {
             if (Integrations.attributeSwapPlugin()) {
                reason = "PaperAttributeSwapFix handles this.";
             } else if (!tweaks.attributeSwappingAvailable()) {
-               reason = "This server has no such switch.";
+               if (Compat.PRE_ATTACK_EVENT) {
+                  notes.add("Done by PvPCore here:");
+                  notes.add("this server has no Paper switch.");
+               } else {
+                  reason = "This server has no such switch.";
+               }
             } else if (!on && tweaks.attributeSwappingByServer()) {
                notes.add("Still on: paper-global.yml turns it on.");
             }
@@ -53,6 +58,11 @@ public final class Status {
          case SPEAR -> {
             if (!Compat.SPEAR) {
                reason = "Needs Minecraft 1.21.11 or newer.";
+            }
+         }
+         case TRACKER -> {
+            if (plugin.ghosts() == null || !plugin.ghosts().scannerAvailable()) {
+               reason = "Needs a newer Paper build.";
             }
          }
          case PACKETS -> {
@@ -94,9 +104,26 @@ public final class Status {
                notes.add("Shield Stun is off.");
             }
          }
-         case WIND_CHARGE_COOLDOWN -> {
+         case WIND_CHARGE_COOLDOWN, WIND_STOP, WIND_JUMP -> {
             if (!Compat.WIND_CHARGE) {
                reason = "No wind charges on this version.";
+            }
+         }
+         case GHOST_SHIELDS -> {
+            if (plugin.ghosts() != null && !plugin.ghosts().lightResync()) {
+               notes.add("Only the held items are re-sent");
+               notes.add("on this server.");
+            }
+         }
+         case GHOST_HEARTS -> {
+            if (plugin.ghosts() != null && !plugin.ghosts().lightResync()) {
+               notes.add("Fixed by re-showing the player");
+               notes.add("on this server (a short blink).");
+            }
+         }
+         case PEARL_ANTI_GLITCH -> {
+            if (!settings.tuning().pearlRefund()) {
+               notes.add("Blocked pearls are not refunded.");
             }
          }
          case BEDROCK_BUFF -> notes.add("Detected with: " + Bedrock.source() + ".");

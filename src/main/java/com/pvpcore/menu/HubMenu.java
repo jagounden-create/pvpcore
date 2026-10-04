@@ -56,7 +56,7 @@ final class HubMenu extends Menu {
       this.button(OVERVIEW, this.overviewIcon(), this::overviewClick);
       this.button(PRESETS, Items.icon(Material.BOOK, this.style.name("Presets", true), List.of(
          this.style.line("One-click setups for Diamond SMP,"),
-         this.style.line("Sword, Mace, Cart or pure vanilla."),
+         this.style.line("Sword, Mace, FFA, Cart or vanilla."),
          Component.empty(),
          this.style.hint("Click", "to open")
       ), false), (player, click) -> {

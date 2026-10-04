@@ -38,6 +38,22 @@ public enum Preset {
       "Vanilla mace damage with smash fall",
       "safety and vanilla knockback."
    ),
+   FFA(
+      "FFA", Material.WIND_CHARGE,
+      settings -> {
+         settings.set(Feature.KNOCKBACK_DISTANCE, false);
+         settings.setValue(Feature.VERTICAL_KNOCKBACK, 0.4);
+         settings.set(Feature.SMASH_PROTECTION, true);
+         settings.set(Feature.SMASH_CAP, true);
+         settings.set(Feature.LUNGE_COOLDOWN, true);
+         settings.set(Feature.SPEAR_CHARGE_CAP, true);
+         settings.set(Feature.COMBAT_TAG, true);
+         settings.set(Feature.INSTANT_RESPAWN, true);
+      },
+      "Mace and spear free-for-all: capped",
+      "one-shots, combat tag, instant respawn",
+      "and every ghost and pearl fix on."
+   ),
    CART(
       "Cart", Material.TNT_MINECART,
       settings -> {

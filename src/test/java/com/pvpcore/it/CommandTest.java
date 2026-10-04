@@ -39,6 +39,13 @@ class CommandTest extends PluginTest {
       assertTrue(this.plugin.settings().on(Feature.NO_SWEEP));
       assertFalse(this.plugin.settings().on(Feature.KNOCKBACK_DISTANCE));
       assertEquals(0.4, this.plugin.settings().value(Feature.VERTICAL_KNOCKBACK), 1.0E-9);
+      admin.performCommand("pvpcore preset ffa");
+      assertTrue(this.plugin.settings().on(Feature.SMASH_CAP));
+      assertTrue(this.plugin.settings().on(Feature.SPEAR_CHARGE_CAP));
+      assertTrue(this.plugin.settings().on(Feature.COMBAT_TAG));
+      assertTrue(this.plugin.settings().on(Feature.GHOST_PLAYERS));
+      assertTrue(this.plugin.settings().on(Feature.PEARL_ANTI_GLITCH));
+      assertFalse(this.plugin.settings().on(Feature.NO_SWEEP));
       admin.performCommand("pvpcore preset cart");
       assertTrue(this.plugin.settings().on(Feature.CART_TERRAIN));
       assertFalse(this.plugin.settings().on(Feature.NO_SWEEP), "presets start from the defaults");

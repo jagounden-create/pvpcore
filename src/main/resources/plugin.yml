@@ -2,13 +2,13 @@ name: PvPCore
 version: '${project.version}'
 main: com.pvpcore.PvPCore
 api-version: '1.21'
-description: PvP optimization for Sword, Mace, Cart and Diamond SMP combat, plus server-side cleanups - every switch in one menu.
+description: Smoother PvP for Sword, Mace, Spear, Cart and Diamond SMP combat - ghost fixes, pearl fixes and server-side cleanups, every switch in one menu.
 softdepend: [KnockbackSync, PaperAttributeSwapFix]
 
 commands:
   pvpcore:
     description: Open the PvP settings menu.
-    usage: /<command> [menu|status|reload|toggle|set|preset]
+    usage: /<command> [menu|status|reload|toggle|set|preset|rules|rule|fix]
     aliases: [pvpc]
     permission: pvpcore.admin
 

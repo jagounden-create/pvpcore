@@ -5,6 +5,7 @@ import com.destroystokyo.paper.event.player.PlayerLaunchProjectileEvent;
 import com.pvpcore.Feature;
 import com.pvpcore.Module;
 import com.pvpcore.PvPCore;
+import com.pvpcore.util.Hits;
 import com.pvpcore.util.Text;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -353,6 +354,11 @@ public final class RulesModule extends Module {
       }
    }
 
+   /** An item was used in a way that bypassed the usual events (a wind charge spent on a wind stop, say). */
+   public void itemUsed(Player player, Material material) {
+      this.used(player, material);
+   }
+
    private void used(Player player, Material material) {
       Rule rule = this.rule(material, player.getWorld());
       if (rule != null && rule.hasCooldown() && !exempt(player)) {
@@ -602,7 +608,7 @@ public final class RulesModule extends Module {
 
          if (source.melee() && source.player() != null) {
             // A sweep is part of the same swing as the main hit, which may have started the cooldown this tick.
-            boolean primary = event.getCause() == DamageCause.ENTITY_ATTACK;
+            boolean primary = Hits.primary(event);
             if (primary ? this.blocked(source.player(), material, rule) : rule.disabled()) {
                event.setCancelled(true);
                return;
@@ -625,7 +631,7 @@ public final class RulesModule extends Module {
          return;
       }
 
-      if (event.getDamager() instanceof Player attacker && event.getCause() == DamageCause.ENTITY_ATTACK) {
+      if (event.getDamager() instanceof Player attacker && Hits.primary(event)) {
          Material weapon = attacker.getInventory().getItemInMainHand().getType();
          if (Rule.weapon(weapon)) {
             this.used(attacker, weapon);
@@ -666,15 +672,11 @@ public final class RulesModule extends Module {
       event.setDamage(Math.max(0.0, damage));
    }
 
-   static boolean melee(DamageCause cause) {
-      return cause == DamageCause.ENTITY_ATTACK || cause == DamageCause.ENTITY_SWEEP_ATTACK;
-   }
-
    /** Which items a hit came from, and the player behind it. */
    Source source(EntityDamageByEntityEvent event) {
       Entity damager = event.getDamager();
       if (damager instanceof Player player) {
-         if (!melee(event.getCause())) {
+         if (!Hits.melee(event)) {
             return new Source(player, List.of(), false);
          }
 

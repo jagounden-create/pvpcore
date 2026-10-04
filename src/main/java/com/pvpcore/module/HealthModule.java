@@ -5,7 +5,9 @@ import com.pvpcore.Module;
 import com.pvpcore.PvPCore;
 import com.pvpcore.util.Text;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -43,8 +45,8 @@ public final class HealthModule extends Module {
    private static final TextColor HEART = TextColor.fromHexString("#FF5C5C");
    private static final TextColor ABSORPTION = TextColor.fromHexString("#FFD34E");
    private static final TextColor WHITE = TextColor.color(0xFFFFFF);
-   /** What each board last showed for each player, so unchanged scores are not re-sent. */
-   private final Map<Scoreboard, Map<UUID, String>> shown = new ConcurrentHashMap<>();
+   /** What each board last showed for each player ({@link #key}), so unchanged scores are not re-sent. */
+   private final Map<Scoreboard, Map<UUID, Long>> shown = new ConcurrentHashMap<>();
    private final Set<UUID> dirty = ConcurrentHashMap.newKeySet();
    private BukkitTask ticker;
    private int ticks;
@@ -86,17 +88,16 @@ public final class HealthModule extends Module {
          this.dirty.clear();
          this.refreshEveryone();
       } else if (!this.dirty.isEmpty()) {
-         Set<Scoreboard> boards = this.boards();
+         List<Player> players = new ArrayList<>(this.dirty.size());
          for (UUID id : this.dirty) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
-               for (Scoreboard board : boards) {
-                  this.refresh(board, player);
-               }
+               players.add(player);
             }
          }
 
          this.dirty.clear();
+         this.push(this.boards(), players);
       }
    }
 
@@ -112,14 +113,46 @@ public final class HealthModule extends Module {
    }
 
    private void refreshEveryone() {
-      for (Scoreboard board : this.boards()) {
-         for (Player player : Bukkit.getOnlinePlayers()) {
-            this.refresh(board, player);
+      this.push(this.boards(), new ArrayList<>(Bukkit.getOnlinePlayers()));
+   }
+
+   /**
+    * Brings {@code players}' scores up to date on every board. Each player's health is read and formatted once, not
+    * once per board: with a sidebar plugin every player has their own board, so this runs players x players times.
+    */
+   private void push(Set<Scoreboard> boards, List<Player> players) {
+      if (players.isEmpty()) {
+         return;
+      }
+
+      Shown[] now = new Shown[players.size()];
+      for (int i = 0; i < now.length; i++) {
+         Player player = players.get(i);
+         double health = player.isDead() ? 0.0 : player.getHealth();
+         now[i] = new Shown(player, health, player.getAbsorptionAmount());
+      }
+
+      for (Scoreboard board : boards) {
+         Objective objective = this.objective(board);
+         if (objective == null) {
+            continue;
+         }
+
+         Map<UUID, Long> seen = this.shown.computeIfAbsent(board, ignored -> new ConcurrentHashMap<>());
+         for (Shown shown : now) {
+            Long before = seen.get(shown.id);
+            if (before == null || before != shown.key) {
+               Score score = objective.getScore(shown.player);
+               score.setScore((int)Math.ceil(shown.health));
+               score.numberFormat(NumberFormat.fixed(shown.line()));
+               seen.put(shown.id, shown.key);
+            }
          }
       }
    }
 
-   private void refresh(Scoreboard board, Player player) {
+   /** This board's health objective, made if missing; null when another plugin owns the below-name slot. */
+   private Objective objective(Scoreboard board) {
       Objective objective = board.getObjective(OBJECTIVE);
       if (objective == null) {
          objective = board.registerNewObjective(OBJECTIVE, Criteria.DUMMY, Component.empty());
@@ -129,22 +162,43 @@ public final class HealthModule extends Module {
 
       if (objective.getDisplaySlot() != DisplaySlot.BELOW_NAME) {
          if (board.getObjective(DisplaySlot.BELOW_NAME) != null) {
-            // Another plugin owns this board's below-name slot; leave it alone.
-            return;
+            return null;
          }
 
          objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
       }
 
-      double health = player.isDead() ? 0.0 : player.getHealth();
-      double absorption = player.getAbsorptionAmount();
-      String key = Text.points(health) + "|" + Text.points(absorption);
-      Map<UUID, String> seen = this.shown.computeIfAbsent(board, ignored -> new ConcurrentHashMap<>());
-      if (!key.equals(seen.get(player.getUniqueId()))) {
-         Score score = objective.getScore(player);
-         score.setScore((int)Math.ceil(health));
-         score.numberFormat(NumberFormat.fixed(health(health, absorption)));
-         seen.put(player.getUniqueId(), key);
+      return objective;
+   }
+
+   /** What the line under a name shows, as one number: whole health points and whole golden-heart points. */
+   static long key(double health, double absorption) {
+      return (long)Math.ceil(Math.max(0.0, health)) << 32 | (long)Math.ceil(Math.max(0.0, absorption)) & 0xFFFFFFFFL;
+   }
+
+   /** One player's line, formatted only if some board needs it. */
+   private static final class Shown {
+      final Player player;
+      final UUID id;
+      final double health;
+      final double absorption;
+      final long key;
+      private Component line;
+
+      Shown(Player player, double health, double absorption) {
+         this.player = player;
+         this.id = player.getUniqueId();
+         this.health = health;
+         this.absorption = absorption;
+         this.key = key(health, absorption);
+      }
+
+      Component line() {
+         if (this.line == null) {
+            this.line = health(this.health, this.absorption);
+         }
+
+         return this.line;
       }
    }
 
@@ -214,7 +268,7 @@ public final class HealthModule extends Module {
    public void onQuit(PlayerQuitEvent event) {
       Player player = event.getPlayer();
       this.dirty.remove(player.getUniqueId());
-      for (Map.Entry<Scoreboard, Map<UUID, String>> entry : this.shown.entrySet()) {
+      for (Map.Entry<Scoreboard, Map<UUID, Long>> entry : this.shown.entrySet()) {
          if (entry.getValue().remove(player.getUniqueId()) != null) {
             Objective objective = entry.getKey().getObjective(OBJECTIVE);
             if (objective != null) {

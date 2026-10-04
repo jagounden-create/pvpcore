@@ -9,7 +9,9 @@
 #
 #  /pvpcore reload     re-read this file (and rules.yml) after editing by hand
 #  /pvpcore status     what is on, and what this server supports
-#  /pvpcore preset     one-click setups: diamond-smp, sword, mace, cart, vanilla
+#  /pvpcore preset     one-click setups: diamond-smp, sword, mace, ffa, cart,
+#                      vanilla
+#  /pvpcore fix        re-show a player who turned invisible to others
 #
 #  Item nerfs, cooldowns and block limits live in rules.yml.
 # ============================================================================
@@ -39,7 +41,8 @@ combat:
   # the end of the tick.
   instant-knockback: true
   # Swap items in the same tick as a hit and keep the damage of the item you
-  # swapped from (axe to sword). Paper turns this off by default.
+  # swapped from (axe to sword). Paper turns this off by default. Where
+  # Paper has no switch for it, PvPCore does it itself - no extra plugin.
   attribute-swapping: true
   hit-delay:
     # Use the invulnerability time below after a hit. Off = vanilla.
@@ -49,8 +52,9 @@ combat:
   # Sword sweeps stop hurting (and pushing) players next to your target.
   disable-sweep: false
   lunge-cooldown:
-    # 1.21.11+: seconds between spear Lunge dashes. A lunge during the
-    # cooldown costs no hunger and does not move you; the jab still hits.
+    # 1.21.11+ (shown under Spear in the menu): seconds between spear Lunge
+    # dashes. A lunge during the cooldown costs no hunger and does not move
+    # you; the jab still hits.
     enabled: true
     seconds: 3.0
   bedrock-buff:
@@ -88,6 +92,50 @@ mace:
     ticks: 10
   # Falls that began with an elytra glide get no smash bonus.
   no-elytra-smash: false
+  wind-stop:
+    # Falling and looking down, use a wind charge to stop the fall instead
+    # of throwing it. The charge is used up, the fall is reset and you keep
+    # a little upward speed - a mid-air save, the same at any ping.
+    enabled: false
+    # Upward speed you're left with, in blocks per tick. 0 = just stop.
+    lift: 0.1
+    # Only while falling at least this fast, in blocks per tick.
+    min-fall-speed: 0.2
+    # Only while looking at least this far down, in degrees (90 = straight).
+    min-pitch: 60
+    # Seconds before the same player can stop again.
+    cooldown-seconds: 1.0
+    # How much sideways speed is kept, 0.0 to 1.0.
+    keep-horizontal: 0.5
+    # false = the wind charge is not used up.
+    consume: true
+  wind-jump:
+    # A wind charge thrown at your feet bursts on the ground at once, on the
+    # server, instead of flying down first - so wind jumps go just as high
+    # every time, at any ping.
+    enabled: false
+    # Only when looking at least this far down, in degrees.
+    min-pitch: 75
+    # Only when the ground is at most this many blocks below you.
+    max-height: 2.0
+
+# ----------------------------------------------------------------------------
+#  SPEAR - 1.21.11+
+# ----------------------------------------------------------------------------
+spear:
+  charge-damage:
+    # Scale the damage of spear charges (holding the spear up and running or
+    # riding into someone). Hits on players only.
+    enabled: false
+    factor: 1.0
+  charge-cap:
+    # Most damage one spear charge on a player can deal, in hearts, before
+    # armor. Stops elytra and horse one-shots.
+    enabled: false
+    hearts: 15
+  # Spear charges made while gliding deal normal hit damage.
+  no-glide-charge: false
+  # Lunge Cooldown is under combat.lunge-cooldown above.
 
 # ----------------------------------------------------------------------------
 #  CART - TNT minecart PvP
@@ -140,7 +188,7 @@ cart:
   no-block-drops: true
 
 # ----------------------------------------------------------------------------
-#  DIAMOND SMP - shields, pots, pearls
+#  DIAMOND SMP - shields, pots, XP
 # ----------------------------------------------------------------------------
 shields:
   # Shields can be raised at all.
@@ -172,23 +220,62 @@ pots:
   # land a step away. Pots with a harmful effect are left alone.
   full-strength-self-pots: true
 
-pearls:
-  # Land exactly where the pearl hit - never short, in mid-air or stuck in
-  # a wall. If that spot is blocked, the vanilla landing is kept.
-  land-on-impact: true
-  # Pearls stop hurting you on landing.
-  no-damage: false
-  cooldown:
-    # Ticks between pearl throws. Vanilla 20.
-    enabled: false
-    ticks: 20
-
 clumps:
   # XP orbs clump together and are absorbed instantly, so XP bottles mend gear
   # in one go.
   enabled: true
   # How close orbs have to be to merge, in blocks.
   merge-radius: 2.0
+
+# ----------------------------------------------------------------------------
+#  FIXES - ghost players, desyncs, pearls
+# ----------------------------------------------------------------------------
+ghost-fixes:
+  # Players never turn invisible to others ("ghosts") after a totem pop,
+  # respawn, long teleport, world change, joining, leaving spectator or
+  # getting off a mount: anyone near who lost them is sent them again.
+  players: true
+  scanner:
+    # Every few seconds, check that players close to each other can really
+    # see each other, and re-show anyone who went missing. Someone has to be
+    # missing on two checks in a row, so it never fires on a normal walk-in.
+    enabled: true
+    seconds: 5
+    # Only check players within this many blocks (capped to what the server
+    # sends anyway).
+    range: 32
+  # Everyone sees whether your shield is really up or down the moment it
+  # changes - no shield that looks raised but isn't, or the other way round.
+  shields: true
+  # Golden hearts, health and apple counts are re-sent after eating a golden
+  # apple, after a totem and when the golden hearts run out, so no one sees
+  # hearts that aren't there.
+  golden-hearts: true
+
+pearls:
+  # Land exactly where the pearl hit - never short, in mid-air or stuck in
+  # a wall. If that spot is blocked, the vanilla landing is kept.
+  land-on-impact: true
+  anti-glitch:
+    # A pearl never puts you inside a block (slabs, panes, doors, trapdoors,
+    # corners) - you land in the nearest clear spot on the pearl's side, or
+    # the teleport is stopped. Pearls also never carry you into another
+    # world through a portal.
+    enabled: true
+    # Give the pearl back when its teleport is stopped (survival only; it is
+    # dropped at your feet if your inventory is full).
+    refund: true
+  lifetime:
+    # Pearls in the air or sitting in a stasis chamber vanish after this many
+    # seconds, so no one can save an escape for later.
+    enabled: true
+    seconds: 20
+  # Pearls stop hurting you on landing.
+  no-damage: false
+  cooldown:
+    # Ticks between pearl throws. Vanilla 20.
+    enabled: false
+    ticks: 20
 
 # ----------------------------------------------------------------------------
 #  GENERAL
@@ -268,3 +355,4 @@ messages:
   rule-cooldown: "<#A1A1AA><item> ready in <white><seconds>s"
   rule-player-limit: "<#F87171>You can only have <limit> <item> placed."
   rule-chunk-limit: "<#F87171>This chunk already has <limit> <item>."
+  pearl-blocked: "<#F87171>That pearl would have glitched you into a block."

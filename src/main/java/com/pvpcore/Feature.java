@@ -50,13 +50,6 @@ public enum Feature {
       "Sword sweeps stop hurting players",
       "standing next to your target."
    ),
-   LUNGE_COOLDOWN(
-      Section.WEAPONS, "combat.lunge-cooldown.enabled", true, Material.TRIDENT, "Lunge Cooldown",
-      new Value("combat.lunge-cooldown.seconds", 3.0, 0.5, 30.0, 0.5, Unit.SECONDS, null),
-      Requirement.SPEAR,
-      "Time between spear Lunge dashes.",
-      "Jabs still hit while it recharges."
-   ),
    BEDROCK_BUFF(
       Section.WEAPONS, "combat.bedrock-buff.enabled", true, Material.BEDROCK, "Bedrock Buff",
       new Value("combat.bedrock-buff.percent", 2.0, 0.5, 10.0, 0.5, Unit.PERCENT, null),
@@ -95,17 +88,62 @@ public enum Feature {
       "After a smash, the next one deals",
       "normal hit damage until it wears off."
    ),
-   WIND_CHARGE_COOLDOWN(
-      Section.MACE, "mace.wind-charge-cooldown.enabled", false, Material.WIND_CHARGE, "Wind Charge Cooldown",
-      new Value("mace.wind-charge-cooldown.ticks", 10.0, 0.0, 100.0, 5.0, Unit.TICKS, "10 ticks"),
-      Requirement.NONE,
-      "Time between wind charge throws."
-   ),
    NO_ELYTRA_SMASH(
       Section.MACE, "mace.no-elytra-smash", false, Material.ELYTRA, "No Elytra Smash", null,
       Requirement.NONE,
       "Falls that began with an elytra",
       "glide get no smash bonus."
+   ),
+   WIND_CHARGE_COOLDOWN(
+      Section.WIND, "mace.wind-charge-cooldown.enabled", false, Material.WIND_CHARGE, "Wind Charge Cooldown",
+      new Value("mace.wind-charge-cooldown.ticks", 10.0, 0.0, 100.0, 5.0, Unit.TICKS, "10 ticks"),
+      Requirement.NONE,
+      "Time between wind charge throws."
+   ),
+   WIND_STOP(
+      Section.WIND, "mace.wind-stop.enabled", false, Material.BREEZE_ROD, "Wind Charge Stop",
+      new Value("mace.wind-stop.lift", 0.1, 0.0, 0.6, 0.05, Unit.LIFT, null),
+      Requirement.NONE,
+      "Use a wind charge while falling and",
+      "looking down to stop in mid-air.",
+      "The number is the speed you keep."
+   ),
+   WIND_JUMP(
+      Section.WIND, "mace.wind-jump.enabled", false, Material.SLIME_BLOCK, "Instant Wind Jump", null,
+      Requirement.NONE,
+      "A wind charge thrown at your feet",
+      "bursts at once, so wind jumps feel",
+      "the same at any ping."
+   ),
+
+   // ---------------------------------------------------------------- Spear
+   LUNGE_COOLDOWN(
+      Section.SPEAR, "combat.lunge-cooldown.enabled", true, Material.RABBIT_FOOT, "Lunge Cooldown",
+      new Value("combat.lunge-cooldown.seconds", 3.0, 0.5, 30.0, 0.5, Unit.SECONDS, null),
+      Requirement.SPEAR,
+      "Time between spear Lunge dashes.",
+      "Jabs still hit while it recharges."
+   ),
+   SPEAR_CHARGE_DAMAGE(
+      Section.SPEAR, "spear.charge-damage.enabled", false, Material.POINTED_DRIPSTONE, "Charge Damage",
+      new Value("spear.charge-damage.factor", 1.0, 0.25, 2.0, 0.05, Unit.FACTOR, "1.0x"),
+      Requirement.SPEAR,
+      "Scales the damage of spear charges",
+      "(the held, running attack)."
+   ),
+   SPEAR_CHARGE_CAP(
+      Section.SPEAR, "spear.charge-cap.enabled", false, Material.ANVIL, "Charge Damage Cap",
+      new Value("spear.charge-cap.hearts", 15.0, 3.0, 50.0, 1.0, Unit.HEARTS, null),
+      Requirement.SPEAR,
+      "Most damage one spear charge can",
+      "deal, before armor. Stops elytra",
+      "and horse one-shots."
+   ),
+   NO_GLIDE_CHARGE(
+      Section.SPEAR, "spear.no-glide-charge", false, Material.PHANTOM_MEMBRANE, "No Elytra Charge", null,
+      Requirement.SPEAR,
+      "Spear charges made while gliding",
+      "deal normal hit damage."
    ),
 
    // ---------------------------------------------------------------- Cart
@@ -213,39 +251,22 @@ public enum Feature {
       "Both players hear the shield break."
    ),
 
-   // ---------------------------------------------------------------- Diamond SMP: pots & pearls
+   // ---------------------------------------------------------------- Diamond SMP: pots & XP
    FAST_POTS(
-      Section.POTS_PEARLS, "pots.fast-pots.enabled", true, Material.SPLASH_POTION, "Fast Pots",
+      Section.POTS, "pots.fast-pots.enabled", true, Material.SPLASH_POTION, "Fast Pots",
       new Value("pots.fast-pots.speed", 2.5, 0.25, 3.5, 0.25, Unit.SPEED, null),
       Requirement.NONE,
       "Pots thrown at your feet burst",
       "instantly, even mid-jump."
    ),
    SELF_POT_FIX(
-      Section.POTS_PEARLS, "pots.full-strength-self-pots", true, Material.GLISTERING_MELON_SLICE, "Pot Accuracy", null,
+      Section.POTS, "pots.full-strength-self-pots", true, Material.GLISTERING_MELON_SLICE, "Pot Accuracy", null,
       Requirement.NONE,
       "Your own healing pots always heal",
       "you at full strength."
    ),
-   SMOOTH_PEARLS(
-      Section.POTS_PEARLS, "pearls.land-on-impact", true, Material.ENDER_PEARL, "Smooth Pearls", null,
-      Requirement.NONE,
-      "Land exactly where your pearl hit,",
-      "never short or stuck in a wall."
-   ),
-   NO_PEARL_DAMAGE(
-      Section.POTS_PEARLS, "pearls.no-damage", false, Material.ENDER_EYE, "No Pearl Damage", null,
-      Requirement.NONE,
-      "Pearls stop hurting you on landing."
-   ),
-   PEARL_COOLDOWN(
-      Section.POTS_PEARLS, "pearls.cooldown.enabled", false, Material.CLOCK, "Pearl Cooldown",
-      new Value("pearls.cooldown.ticks", 20.0, 0.0, 300.0, 5.0, Unit.TICKS, "20 ticks"),
-      Requirement.NONE,
-      "Time between pearl throws."
-   ),
    XP_CLUMPS(
-      Section.POTS_PEARLS, "clumps.enabled", true, Material.EXPERIENCE_BOTTLE, "XP Clumps",
+      Section.POTS, "clumps.enabled", true, Material.EXPERIENCE_BOTTLE, "XP Clumps",
       new Value("clumps.merge-radius", 2.0, 0.0, 6.0, 0.5, Unit.BLOCKS, null),
       Requirement.NONE,
       "XP orbs merge and absorb instantly,",
@@ -322,6 +343,70 @@ public enum Feature {
       Requirement.NONE,
       "Nerfs, cooldowns and limits from",
       "the Item Rules page."
+   ),
+
+   // ---------------------------------------------------------------- Fixes: ghosts
+   GHOST_PLAYERS(
+      Section.GHOSTS, "ghost-fixes.players", true, Material.GLASS, "Ghost Players", null,
+      Requirement.NONE,
+      "Players stay visible to everyone",
+      "after totems, respawns, teleports",
+      "and world changes."
+   ),
+   GHOST_SCANNER(
+      Section.GHOSTS, "ghost-fixes.scanner.enabled", true, Material.SPYGLASS, "Ghost Scanner",
+      new Value("ghost-fixes.scanner.seconds", 5.0, 1.0, 30.0, 1.0, Unit.SECONDS, null),
+      Requirement.TRACKER,
+      "Checks that players near each other",
+      "can really see each other, and",
+      "re-shows anyone who went missing."
+   ),
+   GHOST_SHIELDS(
+      Section.GHOSTS, "ghost-fixes.shields", true, Material.SHIELD, "Ghost Shields", null,
+      Requirement.NONE,
+      "Everyone sees whether your shield",
+      "is really up, the moment it moves."
+   ),
+   GHOST_HEARTS(
+      Section.GHOSTS, "ghost-fixes.golden-hearts", true, Material.GOLDEN_APPLE, "Golden Apple Fix", null,
+      Requirement.NONE,
+      "Golden hearts and apple counts stay",
+      "right after eating, after a totem",
+      "and when the hearts run out."
+   ),
+
+   // ---------------------------------------------------------------- Fixes: pearls
+   SMOOTH_PEARLS(
+      Section.PEARLS, "pearls.land-on-impact", true, Material.ENDER_PEARL, "Smooth Pearls", null,
+      Requirement.NONE,
+      "Land exactly where your pearl hit,",
+      "never short or stuck in a wall."
+   ),
+   PEARL_ANTI_GLITCH(
+      Section.PEARLS, "pearls.anti-glitch.enabled", true, Material.IRON_TRAPDOOR, "Pearl Anti-Glitch", null,
+      Requirement.NONE,
+      "Pearls never put you inside a block",
+      "or into another world. A blocked",
+      "pearl is given back."
+   ),
+   PEARL_LIFETIME(
+      Section.PEARLS, "pearls.lifetime.enabled", true, Material.SOUL_SAND, "Pearl Lifetime",
+      new Value("pearls.lifetime.seconds", 20.0, 5.0, 120.0, 5.0, Unit.SECONDS, "forever"),
+      Requirement.NONE,
+      "Pearls older than this vanish, so",
+      "stasis chambers can't save an",
+      "escape for later."
+   ),
+   NO_PEARL_DAMAGE(
+      Section.PEARLS, "pearls.no-damage", false, Material.ENDER_EYE, "No Pearl Damage", null,
+      Requirement.NONE,
+      "Pearls stop hurting you on landing."
+   ),
+   PEARL_COOLDOWN(
+      Section.PEARLS, "pearls.cooldown.enabled", false, Material.CLOCK, "Pearl Cooldown",
+      new Value("pearls.cooldown.ticks", 20.0, 0.0, 300.0, 5.0, Unit.TICKS, "20 ticks"),
+      Requirement.NONE,
+      "Time between pearl throws."
    );
 
    private final Section section;
@@ -397,11 +482,13 @@ public enum Feature {
    }
 
    public enum Category {
-      SWORD("Sword", Material.NETHERITE_SWORD, "Knockback, hit reg, spears and buffs."),
-      MACE("Mace", Material.MACE, "Smash damage, fall safety and wind charges."),
+      SWORD("Sword", Material.NETHERITE_SWORD, "Knockback, hit reg and buffs."),
+      MACE("Mace", Material.MACE, "Smash damage, fall safety, wind tech."),
+      SPEAR("Spear", spearIcon(), "Lunge cooldown and charge damage."),
       CART("Cart", Material.TNT_MINECART, "Cart hit reg, nerfs and lag fixes."),
-      DIAMOND_SMP("Diamond SMP", Material.DIAMOND_CHESTPLATE, "Shields, stuns, pots and pearls."),
-      GENERAL("General", Material.COMPARATOR, "Health, particles, cleanup and bans.");
+      DIAMOND_SMP("Diamond SMP", Material.DIAMOND_CHESTPLATE, "Shields, stuns, pots and XP."),
+      GENERAL("General", Material.COMPARATOR, "Health, particles, cleanup and bans."),
+      FIXES("Fixes", Material.TOTEM_OF_UNDYING, "Ghost players, desyncs and pearls.");
 
       private final String label;
       private final Material icon;
@@ -411,6 +498,12 @@ public enum Feature {
          this.label = label;
          this.icon = icon;
          this.blurb = blurb;
+      }
+
+      /** A spear where the server has them (1.21.11+), a trident before that. */
+      private static Material spearIcon() {
+         Material spear = Material.matchMaterial("IRON_SPEAR");
+         return spear != null ? spear : Material.TRIDENT;
       }
 
       public String label() {
@@ -467,13 +560,17 @@ public enum Feature {
    public enum Section {
       COMBAT(Category.SWORD, "Knockback & Hits"),
       WEAPONS(Category.SWORD, "Weapons"),
-      MACE(Category.MACE, "Mace"),
+      MACE(Category.MACE, "Smash"),
+      WIND(Category.MACE, "Wind Charges"),
+      SPEAR(Category.SPEAR, "Spear"),
       CART(Category.CART, "Cart PvP"),
       CART_PERF(Category.CART, "Performance"),
       SHIELDS(Category.DIAMOND_SMP, "Shields"),
-      POTS_PEARLS(Category.DIAMOND_SMP, "Pots & Pearls"),
+      POTS(Category.DIAMOND_SMP, "Pots & XP"),
       DISPLAY(Category.GENERAL, "Display"),
-      SERVER(Category.GENERAL, "Server");
+      SERVER(Category.GENERAL, "Server"),
+      GHOSTS(Category.FIXES, "Ghost Fixes"),
+      PEARLS(Category.FIXES, "Pearls");
 
       private final Category category;
       private final String label;
@@ -514,7 +611,9 @@ public enum Feature {
       /** Spears and Lunge (1.21.11+). */
       SPEAR,
       /** Filtering outgoing packets, which needs a Paper server whose network internals were recognised. */
-      PACKETS;
+      PACKETS,
+      /** Paper's entity tracker API (Entity#getTrackedBy). */
+      TRACKER;
    }
 
    public enum Unit {

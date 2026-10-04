@@ -9,6 +9,7 @@ import com.pvpcore.module.CombatModule;
 import com.pvpcore.module.CombatTagModule;
 import com.pvpcore.module.CrystalModule;
 import com.pvpcore.module.GeneralModule;
+import com.pvpcore.module.GhostModule;
 import com.pvpcore.module.HealthModule;
 import com.pvpcore.module.KnockbackModule;
 import com.pvpcore.module.LegacyShieldModule;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -43,6 +45,9 @@ public class PvPCore extends JavaPlugin {
    private final List<Module> modules = new ArrayList<>();
    private CartModule carts;
    private ParticleModule particles;
+   private CombatModule combat;
+   private GhostModule ghosts;
+   private RulesModule itemRules;
    private boolean modernShields;
 
    @Override
@@ -68,7 +73,12 @@ public class PvPCore extends JavaPlugin {
       }
 
       this.add(new PotModule(this));
-      this.add(new CombatModule(this));
+      this.combat = new CombatModule(this);
+      this.add(this.combat);
+      if (Compat.PRE_ATTACK_EVENT) {
+         plugins.registerEvents(this.combat.swapListener(), this);
+      }
+
       if (Compat.KNOCKBACK_EVENT) {
          this.add(new KnockbackModule(this));
       }
@@ -87,7 +97,10 @@ public class PvPCore extends JavaPlugin {
       this.add(this.carts);
       this.add(new GeneralModule(this));
       this.add(new CombatTagModule(this));
-      this.add(new RulesModule(this));
+      this.itemRules = new RulesModule(this);
+      this.add(this.itemRules);
+      this.ghosts = new GhostModule(this);
+      this.add(this.ghosts);
       this.particles = new ParticleModule(this);
       this.add(this.particles);
 
@@ -187,6 +200,21 @@ public class PvPCore extends JavaPlugin {
 
    public boolean modernShields() {
       return this.modernShields;
+   }
+
+   /** Tells the item rules that {@code player} used {@code material}, so its cooldown starts. */
+   public void itemUsed(Player player, Material material) {
+      if (this.itemRules != null) {
+         this.itemRules.itemUsed(player, material);
+      }
+   }
+
+   public GhostModule ghosts() {
+      return this.ghosts;
+   }
+
+   public CombatModule combat() {
+      return this.combat;
    }
 
    public boolean particlesAvailable() {
